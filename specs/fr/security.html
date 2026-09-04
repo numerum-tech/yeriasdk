@@ -1,0 +1,80 @@
+<p>Deux mécanismes de signature encadrent un service Yeria : vous signez les vues que vous renvoyez, Yeria signe les jetons utilisateurs que vous recevez. Les deux sont vérifiés, jamais supposés.</p>
+
+<h2 id="deux-cles">Les deux clés</h2>
+
+<div class="ys-table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Clé</th>
+                <th>Algorithme</th>
+                <th>Détenteur</th>
+                <th>Rôle</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Clé de plateforme</td>
+                <td>RSA (RS256)</td>
+                <td>Yeria</td>
+                <td>Signe les jetons utilisateurs. Vous ne faites que vérifier ; le SDK récupère et met en cache la clé par son <code class="ys-code">kid</code>.</td>
+            </tr>
+            <tr>
+                <td>Clé de service</td>
+                <td>Ed25519</td>
+                <td>Vous</td>
+                <td>Signe les enveloppes de vue et vos appels vers Yeria. La moitié publique est déposée au registre ; la privée ne quitte pas votre backend.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<p>Générer une paire RSA pour votre service est une erreur : le registre refuse tout ce qui n'est pas Ed25519.</p>
+
+<h2 id="cle-privee">La clé privée</h2>
+
+<div class="ys-callout ys-callout-key">
+    <span class="ys-callout-mark"><i class="bi bi-key-fill" aria-hidden="true"></i></span>
+    <div>
+        <div class="ys-callout-title">Elle est l'identité de votre service</div>
+        <p style="margin-bottom:0">Ne la committez jamais, ne l'envoyez jamais à Yeria, ne la placez jamais dans un build mobile. Quiconque la détient peut signer des vues et des appels en votre nom. En cas de fuite, effectuez une rotation immédiate.</p>
+    </div>
+</div>
+
+<h2 id="enveloppe">L'enveloppe signée</h2>
+
+<p><code class="ys-code">app.serve(view)</code> produit une enveloppe v3 :</p>
+
+<pre class="ys-codeblock" data-lang="json"><code>{ "payload": "{\"type\":\"FormView\",…}", "signature": "…" }</code></pre>
+
+<div class="ys-callout ys-callout-info">
+    <span class="ys-callout-mark">i</span>
+    <p>La signature porte sur les octets de la chaîne <code class="ys-code">payload</code>, qui est parsée ensuite. Ne reformatez jamais le JSON après signature : la vérification échouerait.</p>
+</div>
+
+<p>L'application vérifie la signature avant de rendre l'écran. Une vue qu'elle ne peut pas vérifier est refusée — elle n'est pas affichée dégradée.</p>
+
+<h2 id="jetons">Vérifier les jetons entrants</h2>
+
+<p>Yeria est un registre et un fournisseur d'identité, pas un proxy : l'application appelle votre URL directement. C'est donc à vous de vérifier chaque jeton reçu.</p>
+
+<pre class="ys-codeblock" data-lang="js"><code>const user = await app.verifyUserToken(bearer, process.env.YERIA_SERVICE_ID);</code></pre>
+
+<p>Passer l'identifiant de votre service épingle l'audience : un jeton émis pour un autre service est rejeté. La clé de plateforme est récupérée une fois puis mise en cache, donc la vérification ne fait aucun appel réseau ensuite.</p>
+
+<div class="ys-callout ys-callout-warning">
+    <span class="ys-callout-mark">!</span>
+    <p>Le SDK fournit des helpers, pas de middleware. Il n'existe pas de <code class="ys-code">YeriaApp.authMiddleware()</code> : l'intégration à votre framework reste votre choix.</p>
+</div>
+
+<h2 id="rotation">Rotation de clés</h2>
+
+<p>Sur un service déjà approuvé, changer la clé publique est une modification du registre : elle est mise en brouillon et appliquée à la validation de la revue. La rotation d'urgence, après une fuite, suit un chemin distinct décrit dans <a href="/docs/integration">Intégration provider</a>.</p>
+
+<h2 id="transport">Transport et exposition</h2>
+
+<ul>
+    <li>Votre backend doit être joignable en HTTPS depuis les appareils des utilisateurs.</li>
+    <li>Aucune donnée métier ne transite par Yeria : le trafic va du mobile à votre serveur.</li>
+    <li>Les vues ont une durée de validité ; une vue expirée est refusée par l'application.</li>
+</ul>

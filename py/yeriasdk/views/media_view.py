@@ -41,7 +41,6 @@ class MediaView(BaseView):
 
         self.content = {
             "title": title,
-            "intro": "",
             "items": [],
         }
 
@@ -64,7 +63,12 @@ class MediaView(BaseView):
             "poster": item.poster.strip() if item.poster else None,
             "autoplay": item.autoplay,
             "loop": item.loop,
-            "controls": item.controls if item.controls is not None else True,
+            # Left out when the provider did not set it. `controls` is
+            # optional with a documented default of true, and the default
+            # belongs to the client, not to the payload: writing it in made
+            # every bare item carry a key the provider never asked for, and
+            # the JS SDK omits it, so the same item signed differently.
+            "controls": item.controls,
             "sources": [
                 self._normalize_source(source) for source in item.sources
             ],
@@ -90,7 +94,10 @@ class MediaView(BaseView):
         controls: Optional[bool] = None,
     ) -> MediaItem:
         """Build a MediaItem (single source) without adding it to the playlist"""
-        primary_source = self._normalize_source(MediaSource(src=src, type=type))
+        # `add_media_item` normalises every source itself and expects a
+        # MediaSource; handing it the normalised dict crashed on `.src`.
+        normalized = self._normalize_source(MediaSource(src=src, type=type))
+        primary_source = MediaSource(src=normalized["src"], type=normalized["type"])
 
         return MediaItem(
             id=id.strip(),
@@ -100,7 +107,8 @@ class MediaView(BaseView):
             poster=poster.strip() if poster else None,
             autoplay=autoplay,
             loop=loop,
-            controls=controls if controls is not None else True,
+            # Same rule as add_media_item: the default belongs to the client.
+            controls=controls,
             sources=[primary_source],
         )
 

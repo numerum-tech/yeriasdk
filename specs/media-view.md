@@ -59,8 +59,10 @@ playable resource described by its `sources`, `poster`, and playback flags.
 | `toJSON()` | - | `Record<string, unknown>` | Returns JSON representation (inherited from BaseView) |
 | `setState(key, value)` | `key` - State key<br>`value` - State value | `void` | Sets view state (inherited from BaseView) |
 | `getState(key)` | `key` - State key | `unknown` | Gets view state (inherited from BaseView) |
-| `setNext(url)` | `url` - Next view URL | `this` | Sets next view navigation (inherited from BaseView) |
-| `setPrev(url)` | `url` - Previous view URL | `this` | Sets previous view navigation (inherited from BaseView) |
+| `setNext(url)` | `url` - URL or path of the next view | `this` | Forward control of a paginated sequence, drawn by the client — see the Navigation reference on the docs site |
+| `setPrev(url)` | `url` - URL or path of the previous view | `this` | Backward control of the same sequence. NOT where the back gesture leads — see the Navigation reference on the docs site |
+| `setEntry(entry)` | `entry` - `'push'`, `'replace'`, or an integer <= 1 | `this` | How this view enters the client's navigation stack (default: `push`) — see the Navigation reference on the docs site |
+| `setPage(current, total?)` | `current` - 1-based position<br>`total` - sequence length, when known | `this` | Where this view sits in its sequence; the client draws the indicator — see the Navigation reference on the docs site |
 | `setProcess(processId, context?)` | `processId` - Process ID<br>`context` - Process context | `this` | Sets process context (inherited from BaseView) |
 
 ## JavaScript Sample Code

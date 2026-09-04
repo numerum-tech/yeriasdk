@@ -1,0 +1,392 @@
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">FormView</code> component is used to create dynamic forms with various field types, validation rules, and submission actions. It supports a wide range of input types including text, email, password, number, date, select, file uploads, voice and video recording, GPS coordinates, and more.</p>
+
+<p>Forms submit to the exact service URL whose response returned the form. That URL is retained by the client, validated to remain inside the service's declared base URL area, and is not configurable in the form payload. <code class="ys-code">content.submit</code> controls only the button presentation and HTTP method.</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the form view</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Always <code class="ys-code">"Form"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">FormContent</code></td><td>Yes</td><td>Form content object</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Form title displayed to the user</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional introduction/instructions shown above fields</td></tr><tr><td><code class="ys-code">content.note</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Small print under the intro — a caveat, a legal mention, a count. Rendered smaller and dimmed</td></tr><tr><td><code class="ys-code">content.submit</code></td><td><code class="ys-code">SubmitAction</code></td><td>No</td><td>Submit button and HTTP method configuration; it cannot override the destination URL</td></tr><tr><td><code class="ys-code">content.submit.text</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>Button text (required if submit is set)</td></tr><tr><td><code class="ys-code">content.submit.method</code></td><td><code class="ys-code">HttpMethod</code></td><td>No</td><td>HTTP method (default: <code class="ys-code">"POST"</code>)</td></tr><tr><td><code class="ys-code">content.submit.confirmMessage</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional confirmation dialog message</td></tr><tr><td><code class="ys-code">content.secondary</code></td><td><code class="ys-code">SecondaryAction</code></td><td>No</td><td>Second action, rendered under the submit button in the same footer bar, at secondary weight</td></tr><tr><td><code class="ys-code">content.secondary.text</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>Button label (required if secondary is set)</td></tr><tr><td><code class="ys-code">content.secondary.url</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>Where the action goes (required if secondary is set)</td></tr><tr><td><code class="ys-code">content.secondary.mode</code></td><td><code class="ys-code">"navigate" | "submit"</code></td><td>No</td><td><code class="ys-code">navigate</code> (default) calls the URL and renders what comes back — <strong>entered values are discarded</strong>. <code class="ys-code">submit</code> sends the current values to that URL</td></tr><tr><td><code class="ys-code">content.secondary.method</code></td><td><code class="ys-code">HttpMethod</code></td><td>No</td><td><code class="ys-code">submit</code> mode only (default: <code class="ys-code">&quot;POST&quot;</code>)</td></tr><tr><td><code class="ys-code">content.secondary.validate</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Whether the form must be valid first. Defaults to <code class="ys-code">false</code> in <code class="ys-code">navigate</code> mode, <code class="ys-code">true</code> in <code class="ys-code">submit</code> mode</td></tr><tr><td><code class="ys-code">content.secondary.confirmMessage</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional confirmation dialog message</td></tr><tr><td><code class="ys-code">content.fields</code></td><td><code class="ys-code">FormField[]</code></td><td>Yes</td><td>Array of form fields (at least one non-separator field required)</td></tr><tr><td><code class="ys-code">content.fields[].fieldType</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Field type: <code class="ys-code">"text"</code>, <code class="ys-code">"email"</code>, <code class="ys-code">"password"</code>, <code class="ys-code">"number"</code>, <code class="ys-code">"date"</code>, <code class="ys-code">"select"</code>, <code class="ys-code">"photo"</code>, <code class="ys-code">"file"</code>, <code class="ys-code">"audio"</code>, <code class="ys-code">"video"</code>, <code class="ys-code">"gps"</code>, <code class="ys-code">"pluscode"</code>, <code class="ys-code">"hidden"</code>, <code class="ys-code">"textarea"</code>, <code class="ys-code">"phone"</code>, <code class="ys-code">"url"</code>, <code class="ys-code">"checkbox"</code>, <code class="ys-code">"separator"</code>, <code class="ys-code">"paragraph"</code>, <code class="ys-code">"spacer"</code></td></tr><tr><td><code class="ys-code">content.fields[].fieldId</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the field</td></tr><tr><td><code class="ys-code">content.fields[].fieldLabel</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Display label for the field</td></tr><tr><td><code class="ys-code">content.fields[].value</code></td><td><code class="ys-code">unknown</code></td><td>No</td><td>Default/pre-filled value. On a media field (<code class="ys-code">photo</code>, <code class="ys-code">file</code>, <code class="ys-code">audio</code>, <code class="ys-code">video</code>) this is the <strong>relative path</strong> of a file the provider already holds — an array when <code class="ys-code">multiple</code> is set</td></tr><tr><td><code class="ys-code">content.fields[].size</code></td><td><code class="ys-code">"xl" | "lg" | "md" | "sm"</code></td><td>No</td><td><code class="ys-code">paragraph</code>: text size, 24 / 18 / 14 / 12 px. Default <code class="ys-code">&quot;md&quot;</code></td></tr><tr><td><code class="ys-code">content.fields[].size</code></td><td><code class="ys-code">"sm" | "md" | "lg"</code></td><td>No</td><td><code class="ys-code">spacer</code>: how much blank space. Default <code class="ys-code">&quot;md&quot;</code></td></tr><tr><td><code class="ys-code">content.fields[].bold</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td><code class="ys-code">paragraph</code> only</td></tr><tr><td><code class="ys-code">content.fields[].italic</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td><code class="ys-code">paragraph</code> only</td></tr><tr><td><code class="ys-code">content.fields[].required</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Whether the field is required</td></tr><tr><td><code class="ys-code">content.fields[].placeholder</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Placeholder text</td></tr><tr><td><code class="ys-code">content.fields[].helpText</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Help text shown below the field</td></tr><tr><td><code class="ys-code">content.fields[].disabled</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Whether the field is disabled</td></tr><tr><td><code class="ys-code">content.fields[].readonly</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Whether the field is read-only</td></tr><tr><td><code class="ys-code">content.fields[].min</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Minimum value (for number/date fields)</td></tr><tr><td><code class="ys-code">content.fields[].max</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Maximum value (for number/date fields)</td></tr><tr><td><code class="ys-code">content.fields[].minLength</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Minimum string length</td></tr><tr><td><code class="ys-code">content.fields[].maxLength</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Maximum string length</td></tr><tr><td><code class="ys-code">content.fields[].pattern</code></td><td><code class="ys-code">RegExp</code></td><td>No</td><td>Validation regex pattern</td></tr><tr><td><code class="ys-code">content.fields[].options</code></td><td><code class="ys-code">Array&lt;{label: string, value: unknown, selected?: boolean}&gt;</code></td><td>No</td><td>Options for select/radio/checkbox fields</td></tr><tr><td><code class="ys-code">content.fields[].accept</code></td><td><code class="ys-code">string[]</code></td><td>No</td><td>Accepted file types (MIME types)</td></tr><tr><td><code class="ys-code">content.fields[].live</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Enable live updates (for GPS/photo fields)</td></tr><tr><td><code class="ys-code">content.fields[].minDate</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Minimum date (YYYY-MM-DD format)</td></tr><tr><td><code class="ys-code">content.fields[].maxDate</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Maximum date (YYYY-MM-DD format)</td></tr><tr><td><code class="ys-code">content.fields[].multiple</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>photo/file/audio/video: accept more than one item</td></tr><tr><td><code class="ys-code">content.fields[].maxCount</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Upper bound when <code class="ys-code">multiple</code> is true</td></tr><tr><td><code class="ys-code">content.fields[].maxDuration</code></td><td><code class="ys-code">number</code></td><td>No*</td><td>audio/video: maximum recording length in seconds. <strong>Required for <code class="ys-code">video</code></strong></td></tr><tr><td><code class="ys-code">content.fields[].minDuration</code></td><td><code class="ys-code">number</code></td><td>No</td><td>audio/video: minimum recording length in seconds</td></tr><tr><td><code class="ys-code">content.fields[].source</code></td><td><code class="ys-code">string</code></td><td>No</td><td>photo/audio/video: <code class="ys-code">"record"</code>, <code class="ys-code">"library"</code> or <code class="ys-code">"both"</code> (default)</td></tr><tr><td><code class="ys-code">content.fields[].quality</code></td><td><code class="ys-code">string</code></td><td>No</td><td>video only: <code class="ys-code">"low"</code>, <code class="ys-code">"medium"</code> (default) or <code class="ys-code">"high"</code></td></tr><tr><td><code class="ys-code">content.fields[].maxSize</code></td><td><code class="ys-code">number</code></td><td>No</td><td>audio/video: maximum accepted file size in bytes</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Process identifier for multi-step workflows</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>No</td><td>View metadata (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro: string)</code></td><td><code class="ys-code">intro</code> - Introduction text</td><td><code class="ys-code">this</code></td><td>Sets the introduction text displayed above form fields</td></tr><tr><td><code class="ys-code">setNote(note: string)</code></td><td>note</td><td><code class="ys-code">this</code></td><td>Small print under the intro. Rendered smaller and dimmed — a caveat, a legal mention, a count. Distinct from setIntro(), not a replacement for it</td></tr><tr><td><code class="ys-code">addParagraph(text, options?)</code></td><td>text, {size, bold, italic}</td><td><code class="ys-code">this</code></td><td>Adds displayed text among the fields. Not an input: no value, never submitted, skipped by validation</td></tr><tr><td><code class="ys-code">secondaryButton(text, url, options?)</code></td><td>text, url, {mode, method, validate, confirmMessage}</td><td><code class="ys-code">this</code></td><td>Adds a second action under the submit button</td></tr><tr><td><code class="ys-code">belongsToProcess(processId, options?)</code></td><td><code class="ys-code">processId</code> - Process ID<br><code class="ys-code">options</code> - Process options (processName, currentStep, totalSteps, stepName, canGoBack, canSkip)</td><td><code class="ys-code">this</code></td><td>Associates form with a multi-step process workflow</td></tr><tr><td><code class="ys-code">addField(fieldType, fieldId, fieldLabel, params?)</code></td><td><code class="ys-code">fieldType</code> - Field type<br><code class="ys-code">fieldId</code> - Unique field ID<br><code class="ys-code">fieldLabel</code> - Display label<br><code class="ys-code">params</code> - Field parameters</td><td><code class="ys-code">this</code></td><td>Adds a field with validation</td></tr><tr><td><code class="ys-code">submitButton(text, method?, confirmMessage?)</code></td><td><code class="ys-code">text</code> - Button text<br><code class="ys-code">method</code> - HTTP method (default: POST)<br><code class="ys-code">confirmMessage</code> - Optional confirmation</td><td><code class="ys-code">this</code></td><td>Defines the submit button</td></tr><tr><td><code class="ys-code">updateButton(text, confirmMessage?)</code></td><td><code class="ys-code">text</code> - Button text<br><code class="ys-code">confirmMessage</code> - Optional confirmation</td><td><code class="ys-code">this</code></td><td>Convenience method for PUT operations</td></tr><tr><td><code class="ys-code">deleteButton(text, confirmMessage?)</code></td><td><code class="ys-code">text</code> - Button text<br><code class="ys-code">confirmMessage</code> - Confirmation message</td><td><code class="ys-code">this</code></td><td>Convenience method for DELETE operations</td></tr><tr><td><code class="ys-code">addTextField(fieldId, fieldLabel, isRequired?, maxLength?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">maxLength</code> - Max length</td><td><code class="ys-code">this</code></td><td>Adds a text input field</td></tr><tr><td><code class="ys-code">addEmailField(fieldId, fieldLabel, isRequired?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag</td><td><code class="ys-code">this</code></td><td>Adds an email input field</td></tr><tr><td><code class="ys-code">addPasswordField(fieldId, fieldLabel, minLength?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">minLength</code> - Minimum length (default: 8)</td><td><code class="ys-code">this</code></td><td>Adds a password field</td></tr><tr><td><code class="ys-code">addNumberField(fieldId, fieldLabel, isRequired?, minVal?, maxVal?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">minVal</code> - Minimum value<br><code class="ys-code">maxVal</code> - Maximum value</td><td><code class="ys-code">this</code></td><td>Adds a number input field</td></tr><tr><td><code class="ys-code">addDateField(fieldId, fieldLabel, isRequired?, minDate?, maxDate?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">minDate</code> - Min date (YYYY-MM-DD)<br><code class="ys-code">maxDate</code> - Max date (YYYY-MM-DD)</td><td><code class="ys-code">this</code></td><td>Adds a date input field</td></tr><tr><td><code class="ys-code">addSelectField(fieldId, fieldLabel, isRequired?, options, display?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">options</code> - Array of {label, value}<br><code class="ys-code">display</code> - <code class="ys-code">'dropdown'</code> (default) or <code class="ys-code">'radio'</code></td><td><code class="ys-code">this</code></td><td>One choice among several. <code class="ys-code">display</code> is a presentation preference, not a different field: <code class="ys-code">radio</code> lays every option flat in the form, <code class="ys-code">dropdown</code> opens a selection sheet. A client that does not know the key falls back to the sheet</td></tr><tr><td><code class="ys-code">addPhotoField(fieldId, fieldLabel, isRequired?, formats?, live?, options?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">formats</code> - Accepted formats (default: ['jpeg', 'png'])<br><code class="ys-code">live</code> - Live updates<br><code class="ys-code">options</code> - <code class="ys-code">{multiple, maxCount, source}</code></td><td><code class="ys-code">this</code></td><td>Adds a photo upload field</td></tr><tr><td><code class="ys-code">addFileField(fieldId, fieldLabel, isRequired?, formats, options?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">formats</code> - MIME types array<br><code class="ys-code">options</code> - <code class="ys-code">{multiple, maxCount}</code></td><td><code class="ys-code">this</code></td><td>Adds a file upload field</td></tr><tr><td><code class="ys-code">addAudioField(fieldId, fieldLabel, isRequired?, options?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">options</code> - <code class="ys-code">{maxDuration, minDuration, source, multiple, maxCount, maxSize, formats}</code></td><td><code class="ys-code">this</code></td><td>Adds a voice-recording field</td></tr><tr><td><code class="ys-code">addVideoField(fieldId, fieldLabel, isRequired?, options)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">options</code> - <code class="ys-code">{maxDuration (required), minDuration, quality, source, multiple, maxCount, maxSize, formats}</code></td><td><code class="ys-code">this</code></td><td>Adds a video-recording field</td></tr><tr><td><code class="ys-code">addGPSField(fieldId, fieldLabel, isRequired?, liveData?, config?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">liveData</code> - Live updates<br><code class="ys-code">config</code> - GPS config (altitude, precision)</td><td><code class="ys-code">this</code></td><td>Adds a GPS location field</td></tr><tr><td><code class="ys-code">addPlusCodeField(fieldId, fieldLabel, isRequired?, liveData?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">liveData</code> - Live updates</td><td><code class="ys-code">this</code></td><td>Adds a Plus Code field</td></tr><tr><td><code class="ys-code">addHiddenField(fieldId, fieldLabel, value)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">value</code> - Field value</td><td><code class="ys-code">this</code></td><td>Adds a hidden field</td></tr><tr><td><code class="ys-code">addTextAreaField(fieldId, fieldLabel, isRequired?, minLength?, maxLength?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag<br><code class="ys-code">minLength</code> - Min length<br><code class="ys-code">maxLength</code> - Max length</td><td><code class="ys-code">this</code></td><td>Adds a textarea field</td></tr><tr><td><code class="ys-code">addPhoneField(fieldId, fieldLabel, isRequired?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag</td><td><code class="ys-code">this</code></td><td>Adds a phone number field</td></tr><tr><td><code class="ys-code">addURLField(fieldId, fieldLabel, isRequired?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag</td><td><code class="ys-code">this</code></td><td>Adds a URL field</td></tr><tr><td><code class="ys-code">addCheckboxField(fieldId, fieldLabel, isRequired?)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">fieldLabel</code> - Label<br><code class="ys-code">isRequired</code> - Required flag</td><td><code class="ys-code">this</code></td><td>Adds a checkbox field</td></tr><tr><td><code class="ys-code">addSpacer(size?)</code></td><td><code class="ys-code">size</code> - <code class="ys-code">'sm'</code>, <code class="ys-code">'md'</code> (default) or <code class="ys-code">'lg'</code></td><td><code class="ys-code">this</code></td><td>Adds blank vertical space between fields — nothing is drawn</td></tr><tr><td><code class="ys-code">addSeparator(fieldId?)</code></td><td><code class="ys-code">fieldId</code> - Optional field ID (auto-generated if not provided)</td><td><code class="ys-code">this</code></td><td>Adds a visual separator to group form fields (rendered as gap or line)</td></tr><tr><td><code class="ys-code">injectData(data)</code></td><td><code class="ys-code">data</code> - Object with fieldId-value pairs</td><td><code class="ys-code">Result&lt;void, string[]&gt;</code></td><td>Injects data into existing fields (handles select options automatically)</td></tr><tr><td><code class="ys-code">setFieldValue(fieldId, value)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">value</code> - Value to set</td><td><code class="ys-code">this</code></td><td>Sets the value of a specific field</td></tr><tr><td><code class="ys-code">validateFormData(formData)</code></td><td><code class="ys-code">formData</code> - Form data object</td><td><code class="ys-code">ValidationResult</code></td><td>Validates form data against field validations</td></tr><tr><td><code class="ys-code">getField(fieldId)</code></td><td><code class="ys-code">fieldId</code> - Field ID</td><td><code class="ys-code">FormField | undefined</code></td><td>Gets a field by ID</td></tr><tr><td><code class="ys-code">removeField(fieldId)</code></td><td><code class="ys-code">fieldId</code> - Field ID</td><td><code class="ys-code">Result&lt;void, string&gt;</code></td><td>Removes a field by ID</td></tr><tr><td><code class="ys-code">updateField(fieldId, updates)</code></td><td><code class="ys-code">fieldId</code> - Field ID<br><code class="ys-code">updates</code> - Partial field updates</td><td><code class="ys-code">Result&lt;void, string&gt;</code></td><td>Updates an existing field</td></tr><tr><td><code class="ys-code">getFields()</code></td><td>-</td><td><code class="ys-code">FormField[]</code></td><td>Gets all fields</td></tr><tr><td><code class="ys-code">getFieldCount(excludeSeparators?)</code></td><td><code class="ys-code">excludeSeparators</code> - Exclude separator fields (default: false)</td><td><code class="ys-code">number</code></td><td>Gets the number of fields (optionally excluding separators)</td></tr><tr><td><code class="ys-code">hasRequiredFields()</code></td><td>-</td><td><code class="ys-code">boolean</code></td><td>Checks if form has required fields</td></tr><tr><td><code class="ys-code">getRequiredFields()</code></td><td>-</td><td><code class="ys-code">string[]</code></td><td>Gets array of required field IDs</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Serves the view with validation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Returns JSON representation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - State key<br><code class="ys-code">value</code> - State value</td><td><code class="ys-code">void</code></td><td>Sets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - State key</td><td><code class="ys-code">unknown</code></td><td>Gets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL or path of the next view</td><td><code class="ys-code">this</code></td><td>Forward control of a paginated sequence, drawn by the client — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL or path of the previous view</td><td><code class="ys-code">this</code></td><td>Backward control of the same sequence. NOT where the back gesture leads — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, or an integer &lt;= 1</td><td><code class="ys-code">this</code></td><td>How this view enters the client's navigation stack (default: <code class="ys-code">push</code>) — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - 1-based position<br><code class="ys-code">total</code> - sequence length, when known</td><td><code class="ys-code">this</code></td><td>Where this view sits in its sequence; the client draws the indicator — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Process ID<br><code class="ys-code">context</code> - Process context</td><td><code class="ys-code">this</code></td><td>Sets process context (inherited from BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">JavaScript Sample Code</h2>
+
+<h3 id="basic-form">Basic Form</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const form = yeriaApp
+    .createFormView('user-registration', 'User Registration')
+    .setIntro('Please fill in all required fields')
+    .addTextField('firstName', 'First Name', true, 50)
+    .addTextField('lastName', 'Last Name', true, 50)
+    .addEmailField('email', 'Email Address', true)
+    .addPhoneField('phone', 'Phone Number', false)
+    .submitButton('Create Account', 'POST');
+
+const response = yeriaApp.serve(form);</code></pre>
+
+<h3 id="form-with-select-field">Form with Select Field</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('survey', 'Customer Survey')
+    .addSelectField('country', 'Country', true, [
+        { label: 'France', value: 'FR' },
+        { label: 'Canada', value: 'CA' },
+        { label: 'Belgium', value: 'BE' }
+    ])
+    .addSelectField('rating', 'Rating', true, [
+        { label: 'Excellent', value: 5 },
+        { label: 'Good', value: 4 },
+        { label: 'Average', value: 3 },
+        { label: 'Poor', value: 2 },
+        { label: 'Very Poor', value: 1 }
+    ])
+    .submitButton('Submit Survey', 'POST');</code></pre>
+
+<h3 id="form-with-file-upload">Form with File Upload</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('document-upload', 'Upload Document')
+    .addFileField('document', 'Document', true, [
+        'application/pdf',
+        'image/jpeg',
+        'image/png'
+    ])
+    .addPhotoField('photo', 'Profile Photo', false, ['jpeg', 'png'], true)
+    .submitButton('Upload', 'POST');</code></pre>
+
+<h3 id="form-with-voice-and-video-recording">Form with Voice and Video Recording</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('incident-report', 'Report an Incident')
+    .addTextField('summary', 'What happened', true, 200)
+    .addAudioField('statement', 'Spoken statement', false, {
+        maxDuration: 120,      // seconds
+        minDuration: 2,        // rejects an accidental tap-and-release
+        source: 'record'       // microphone only — no picking an old file
+    })
+    .addVideoField('evidence', 'Video evidence', false, {
+        maxDuration: 30,       // REQUIRED — this is what bounds the upload size
+        quality: 'low',        // ~480p; ~7 MB per minute
+        source: 'both',        // record now, or pick from the gallery
+        maxSize: 15 * 1024 * 1024
+    })
+    .submitButton('Send report', 'POST');</code></pre>
+
+<h4>How the recording reaches the provider</h4>
+
+<p>There is no separate upload endpoint. The captured file rides the <strong>normal form submission</strong>: the client sends <code class="ys-code">multipart/form-data</code> to the same validated service URL that returned the form, with the recording as a file part named after its <code class="ys-code">fieldId</code> (<code class="ys-code">fieldId_0</code>, <code class="ys-code">fieldId_1</code>, … when <code class="ys-code">multiple</code> is set), and every other field as a regular form part.</p>
+
+<p>Sizing is the provider's responsibility. <code class="ys-code">maxDuration</code> × <code class="ys-code">quality</code> is what bounds the payload:</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th><code class="ys-code">quality</code></th><th>Approx. resolution / bitrate</th><th>Per minute</th></tr></thead><tbody><tr><td><code class="ys-code">low</code></td><td>480p / ~1 Mbps</td><td>~7 MB</td></tr><tr><td><code class="ys-code">medium</code> (default)</td><td>720p / ~2.5 Mbps</td><td>~19 MB</td></tr><tr><td><code class="ys-code">high</code></td><td>1080p / ~4 Mbps</td><td>~30 MB</td></tr></tbody></table></div>
+
+<p>Audio is far smaller — voice at the renderer's default encoding runs roughly 0.5 MB per minute. Figures are typical mobile-encoder output, not a guarantee: set the service's request body limit above what the declared constraints imply, with headroom. Use <code class="ys-code">maxSize</code> to make the client refuse an oversized file before it starts uploading, rather than failing mid-request.</p>
+
+<p><code class="ys-code">maxDuration</code> is mandatory on <code class="ys-code">video</code> — building the view throws without it.</p>
+
+<h4>What a capture actually produces</h4>
+
+<p><code class="ys-code">accept</code> declares what the field will <em>take</em>. What the renderer <em>captures</em> is narrower, and a provider that stores or re-serves the file should plan for it:</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th></th><th>Captured as</th></tr></thead><tbody><tr><td><code class="ys-code">audio</code></td><td>AAC, mono, ~64 kbps, in an MP4 container (<code class="ys-code">.m4a</code>)</td></tr><tr><td><code class="ys-code">video</code></td><td>H.264 in an MP4 container (<code class="ys-code">.mp4</code>), at the <code class="ys-code">quality</code> resolution</td></tr><tr><td>orientation</td><td>Whichever way the phone was held. Portrait and landscape are both possible</td></tr></tbody></table></div>
+
+<p><strong>Video orientation travels as MP4 rotation metadata, not as rotated pixels.</strong> The stored frames are in sensor orientation and the container carries the rotation to apply; that is how every phone camera writes video. A player that honours the metadata shows it upright, and one that ignores it shows it on its side. If the service re-encodes, thumbnails, or streams the clip, it has to carry that rotation through — dropping it is the usual reason a clip that looked right on the phone appears sideways afterwards.</p>
+
+<p>A file chosen from the library instead of recorded can be anything <code class="ys-code">accept</code> allows — any orientation, any duration.</p>
+
+<h4>Validate everything again on the server</h4>
+
+<p>The renderer enforces <code class="ys-code">maxDuration</code> by stopping the recorder, and refuses a capture that violates <code class="ys-code">minDuration</code> or <code class="ys-code">maxSize</code>. None of that is a guarantee:</p>
+
+<ul><li><code class="ys-code">minDuration</code> is checked only against a <strong>recorded</strong> take. A file picked from the library has no measured duration, so the rule is skipped rather than enforced on no evidence.</li><li>Every constraint lives in a payload the client could ignore.</li></ul>
+
+<p>Treat the declared constraints as the contract you asked for, and re-check duration, size and type on arrival.</p>
+
+<h3 id="form-with-gps-field">Form with GPS Field</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('location-form', 'Record Location')
+    .addGPSField('location', 'Your Location', true, true, {
+        altitude: true,
+        precision: true
+    })
+    .addPlusCodeField('pluscode', 'Plus Code', false, true)
+    .submitButton('Save Location', 'POST');</code></pre>
+
+<h3 id="form-with-date-field">Form with Date Field</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('appointment', 'Schedule Appointment')
+    .addDateField('appointmentDate', 'Appointment Date', true, '2025-01-01', '2025-12-31')
+    .addTextField('notes', 'Additional Notes', false)
+    .submitButton('Book Appointment', 'POST');</code></pre>
+
+<h3 id="form-with-pre-filled-data">Form with Pre-filled Data</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('edit-profile', 'Edit Profile')
+    .addTextField('name', 'Full Name', true)
+    .addEmailField('email', 'Email', true)
+    .addSelectField('country', 'Country', false, [
+        { label: 'France', value: 'FR' },
+        { label: 'Canada', value: 'CA' }
+    ]);
+
+// Inject pre-filled data
+form.injectData({
+    name: 'John Doe',
+    email: 'john@example.com',
+    country: 'FR'  // Automatically selects the option with value 'FR'
+});
+
+form.submitButton('Update Profile', 'PUT');</code></pre>
+
+<h3 id="form-with-validation">Form with Validation</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('registration', 'Register')
+    .addPasswordField('password', 'Password', true, 8)
+    .addTextField('username', 'Username', true)
+    .addField('text', 'username', 'Username', {
+        required: true,
+        minLength: 3,
+        maxLength: 20,
+        pattern: /^[a-zA-Z0-9_]+$/
+    })
+    .submitButton('Register', 'POST');</code></pre>
+
+<h3 id="form-with-separators">Form with Separators</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('registration', 'User Registration')
+    .addTextField('firstName', 'First Name', true)
+    .addTextField('lastName', 'Last Name', true)
+    .addSeparator()  // Visual separator between sections
+    .addEmailField('email', 'Email', true)
+    .addPhoneField('phone', 'Phone', false)
+    .addSeparator('billing-separator')  // With explicit ID
+    .addTextField('address', 'Address', true)
+    .addTextField('city', 'City', true)
+    .submitButton('Register', 'POST');</code></pre>
+
+<p><strong>Note:</strong> Separators are visual elements only and don't collect data. They are excluded from "at least one field" validation, so a form must have at least one non-separator field.</p>
+
+<h3 id="spacers">Spacers</h3>
+
+<p>A separator draws a rule and says "a new group starts here". A spacer draws nothing and simply lets a group breathe:</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>form.addTextField('street', 'Street')
+    .addSpacer('sm')
+    .addTextField('city', 'City')
+    .addSpacer('lg')
+    .addTextField('comment', 'Anything to add?');</code></pre>
+
+<p>Three steps only — <code class="ys-code">sm</code>, <code class="ys-code">md</code> (default), <code class="ys-code">lg</code> — and no number: you ask for a gap, the client decides what it measures. A size outside them is refused when you build the view, not silently normalised.</p>
+
+<p>Like separators, spacers carry no value, are skipped by validation, never reach the submission, and do not count towards "at least one field".</p>
+
+<h3 id="displayed-text-between-fields">Displayed Text Between Fields</h3>
+
+<p><code class="ys-code">addParagraph</code> puts text among the fields — a heading, an instruction, or the data the user has to read in order to answer. It is not an input: it holds no value, is never submitted, and validation skips it.</p>
+
+<p>The four sizes are <strong>sizes, not roles</strong>. Nothing here says a block is a heading; what a size means is the provider's call. Bold and italic are separate, explicit choices.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>form
+  .addParagraph('Pieces to provide', { size: 'xl' })
+  .addParagraph('A valid ID and a proof of address, both less than three months old.')
+  .addParagraph('Scans are accepted; photographs must be legible.', { size: 'sm', italic: true })
+  .addSeparator()
+  .addTextField('id_number', 'ID number', true);</code></pre>
+
+<div class="ys-table-wrap"><table><thead><tr><th>size</th><th>Rendering</th></tr></thead><tbody><tr><td><code class="ys-code">xl</code></td><td>24 px</td></tr><tr><td><code class="ys-code">lg</code></td><td>18 px</td></tr><tr><td><code class="ys-code">md</code></td><td>14 px — default</td></tr><tr><td><code class="ys-code">sm</code></td><td>12 px</td></tr></tbody></table></div>
+
+<h3 id="a-second-action">A Second Action</h3>
+
+<p>A form has one submit. <code class="ys-code">secondaryButton</code> adds a second action under it, in the same footer bar and at secondary weight — Skip, Cancel, Save as draft.</p>
+
+<p><code class="ys-code">mode</code> says what happens to what the user typed, and it is explicit on purpose:</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>// 'navigate' — calls the URL and renders what comes back.
+// What the user typed is DISCARDED. This is Skip / Cancel.
+form.secondaryButton('Skip', 'items/42/skip');
+
+// 'submit' — sends the current values to a SECOND destination.
+form.secondaryButton('Save as draft', 'drafts', {
+  mode: 'submit',
+  method: 'PUT',
+  confirmMessage: 'Save and come back later?'
+});</code></pre>
+
+<p><code class="ys-code">validate</code> decides whether the form must be valid first. It defaults to <code class="ys-code">false</code> in <code class="ys-code">navigate</code> mode — a Skip blocked by an empty required field would be absurd — and to <code class="ys-code">true</code> in <code class="ys-code">submit</code> mode.</p>
+
+<h3 id="read-only-and-disabled-fields">Read-only and Disabled Fields</h3>
+
+<p>Both are field states, and they are not interchangeable:</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th></th><th>Editable</th><th>Visible</th><th>Submitted</th></tr></thead><tbody><tr><td><code class="ys-code">readonly</code></td><td>no</td><td>yes, at full legibility</td><td><strong>yes</strong></td></tr><tr><td><code class="ys-code">disabled</code></td><td>no</td><td>yes, dimmed</td><td><strong>no</strong></td></tr></tbody></table></div>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>form
+  // Fixed by the provider, and part of what the server receives back.
+  .addField('text', 'campaign', 'Campaign', { value: 'Adele-2026', readonly: true })
+  // Shown for context, deliberately left out of the payload.
+  .addField('text', 'quota', 'Remaining quota', { value: '12', disabled: true });</code></pre>
+
+<h3 id="serving-stored-media">Serving Stored Media</h3>
+
+<p>A media field can show a file the provider <strong>already holds</strong> instead of asking for a new capture. Set <code class="ys-code">value</code> to the file's path and <code class="ys-code">readonly</code> to <code class="ys-code">true</code>: the player works, the add and delete controls disappear.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>form
+  .addAudioField('previous_take', 'Your previous take', false, {
+    value: 'api/media/take-42.m4a',
+    readonly: true
+  })
+  .addPhotoField('documents', 'Documents on file', false, ['jpeg'], false, {
+    multiple: true,
+    value: ['api/media/id-front.jpg', 'api/media/id-back.jpg'],
+    readonly: true
+  });</code></pre>
+
+<p><strong>The path must be relative to your service base.</strong> This is the platform's asset policy, not a convention: <code class="ys-code">http(s)://</code>, <code class="ys-code">//host</code>, <code class="ys-code">file://</code> and <code class="ys-code">data:</code> are refused by the renderer and nothing is displayed. To serve from a CDN, answer the relative URL with a redirect — the player follows the 3xx to your signed URL transparently.</p>
+
+<h3 id="form-in-process-workflow">Form in Process Workflow</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const form = yeriaApp
+    .createFormView('step-1', 'Personal Information')
+    .belongsToProcess('onboarding', {
+        processName: 'User Onboarding',
+        currentStep: 1,
+        totalSteps: 3,
+        stepName: 'Personal Info',
+        canGoBack: false,
+        canSkip: false
+    })
+    .addTextField('firstName', 'First Name', true)
+    .addTextField('lastName', 'Last Name', true)
+    .submitButton('Next', 'POST');</code></pre>
+
+<h2 id="complete-json-example">Complete JSON Example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "user-registration",
+  "type": "Form",
+  "content": {
+    "title": "User Registration",
+    "intro": "Please fill in your information to create an account",
+    "submit": {
+      "text": "Register",
+      "method": "POST",
+      "confirmMessage": "Are you sure you want to submit?"
+    },
+    "fields": [
+      {
+        "fieldType": "text",
+        "fieldId": "firstName",
+        "fieldLabel": "First Name",
+        "required": true,
+        "placeholder": "Enter your first name",
+        "maxLength": 50,
+        "helpText": "Your legal first name"
+      },
+      {
+        "fieldType": "text",
+        "fieldId": "lastName",
+        "fieldLabel": "Last Name",
+        "required": true,
+        "placeholder": "Enter your last name",
+        "maxLength": 50
+      },
+      {
+        "fieldType": "separator",
+        "fieldId": "separator-1234567890-1234",
+        "fieldLabel": ""
+      },
+      {
+        "fieldType": "email",
+        "fieldId": "email",
+        "fieldLabel": "Email Address",
+        "required": true,
+        "placeholder": "you@example.com",
+        "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+      },
+      {
+        "fieldType": "phone",
+        "fieldId": "phone",
+        "fieldLabel": "Phone Number",
+        "required": false,
+        "placeholder": "+1234567890"
+      },
+      {
+        "fieldType": "select",
+        "fieldId": "country",
+        "fieldLabel": "Country",
+        "required": true,
+        "options": [
+          {
+            "label": "France",
+            "value": "FR",
+            "selected": false
+          },
+          {
+            "label": "United States",
+            "value": "US",
+            "selected": true
+          },
+          {
+            "label": "Canada",
+            "value": "CA",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "fieldType": "date",
+        "fieldId": "birthDate",
+        "fieldLabel": "Date of Birth",
+        "required": true,
+        "minDate": "1900-01-01",
+        "maxDate": "2010-12-31"
+      },
+      {
+        "fieldType": "number",
+        "fieldId": "age",
+        "fieldLabel": "Age",
+        "required": false,
+        "min": 18,
+        "max": 120,
+        "value": 25
+      },
+      {
+        "fieldType": "audio",
+        "fieldId": "statement",
+        "fieldLabel": "Spoken statement",
+        "required": false,
+        "accept": ["audio/mp4", "audio/mpeg", "audio/wav", "audio/aac"],
+        "maxDuration": 120,
+        "minDuration": 2,
+        "source": "record"
+      },
+      {
+        "fieldType": "video",
+        "fieldId": "evidence",
+        "fieldLabel": "Video evidence",
+        "required": false,
+        "accept": ["video/mp4", "video/quicktime", "video/webm"],
+        "maxDuration": 30,
+        "quality": "low",
+        "source": "both",
+        "maxSize": 15728640
+      }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

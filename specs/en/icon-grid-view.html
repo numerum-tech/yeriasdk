@@ -1,0 +1,81 @@
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">IconGridView</code> component displays actions as an <strong>app-launcher style grid</strong>: each action is a <strong>square or circle image tile with its label underneath</strong>. It is denser and more icon-oriented than <code class="ys-code">ActionGridView</code> (which shows image + title + description cards).</p>
+
+<p>It shares the same action model and the same navigation behaviour as the other action views: when an action is selected, the mobile app requests <code class="ys-code">{currentUrl}/{actionCode}</code> (same flow as <code class="ys-code">ActionGrid</code> / <code class="ys-code">ActionList</code>).</p>
+
+<p>Use it for dashboards / launchers / category pickers where a compact icon-and-label layout reads better than full cards.</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the icon grid view</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Always <code class="ys-code">"IconGrid"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">IconGridContent</code></td><td>Yes</td><td>Icon grid content object</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional title displayed above the grid</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional introduction text displayed before the grid</td></tr><tr><td><code class="ys-code">content.shape</code></td><td><code class="ys-code">"circle" | "square"</code></td><td>No</td><td>Tile shape for <strong>all</strong> tiles (default: <code class="ys-code">"circle"</code>)</td></tr><tr><td><code class="ys-code">content.columns</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Number of columns (2-6, default: 4)</td></tr><tr><td><code class="ys-code">content.spacing</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Spacing between tiles in pixels (default: 12)</td></tr><tr><td><code class="ys-code">content.actions</code></td><td><code class="ys-code">ActionConfig[]</code></td><td>Yes</td><td>Array of actions (at least one required)</td></tr><tr><td><code class="ys-code">content.actions[].code</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique action code (used in the request)</td></tr><tr><td><code class="ys-code">content.actions[].title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Caption shown <strong>under</strong> the tile</td></tr><tr><td><code class="ys-code">content.actions[].thumbnail</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Image URL rendered <strong>inside</strong> the tile (clipped to <code class="ys-code">shape</code>)</td></tr><tr><td><code class="ys-code">content.actions[].badge</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Small overlay text on the tile (e.g. <code class="ys-code">"3"</code>, <code class="ys-code">"New"</code>)</td></tr><tr><td><code class="ys-code">content.actions[].disabled</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Whether the tile is disabled — greyed and non-tappable (default: false)</td></tr><tr><td><code class="ys-code">content.actions[].desc</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional description. <strong>Kept for parity, but the mobile IconGrid renderer ignores it</strong> (no text under the icon besides the title).</td></tr><tr><td><code class="ys-code">content.actions[].metadata</code></td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>No</td><td>Optional metadata for the action</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Process identifier for multi-step workflows</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>No</td><td>View metadata (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<blockquote><p>Rendering notes (mobile): the <code class="ys-code">thumbnail</code> image is clipped to a circle (<code class="ys-code">shape:"circle"</code>) or a rounded square (<code class="ys-code">shape:"square"</code>); the <code class="ys-code">title</code> caption sits under the tile on a single line with ellipsis; <code class="ys-code">badge</code> renders as a small overlay at the top-right of the tile; a <code class="ys-code">disabled</code> tile is dimmed and not tappable. <code class="ys-code">desc</code> is <strong>not</strong> rendered.  <strong>Asset URLs (applies to all SGUI components):</strong> <code class="ys-code">thumbnail</code> — like every image/media asset in a provider view — must be a <strong>relative path</strong>, resolved by the client against the <strong>service base</strong> (the view's own URL). Absolute <code class="ys-code">http(s)://</code>, <code class="ys-code">//host</code>, <code class="ys-code">file://</code> and <code class="ys-code">data:</code> values are <strong>rejected</strong> by the renderer (no external hosts, no cleartext, no local-file/inline payloads). To serve assets from a CDN, return a relative path whose endpoint <strong>302-redirects to a short-lived signed CDN URL</strong> — the client/player follows the redirect transparently.</p></blockquote>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setTitle(title)</code></td><td><code class="ys-code">title</code></td><td><code class="ys-code">this</code></td><td>Sets the title above the grid</td></tr><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code></td><td><code class="ys-code">this</code></td><td>Sets the intro text above the grid</td></tr><tr><td><code class="ys-code">setShape(shape)</code></td><td><code class="ys-code">shape</code> - <code class="ys-code">"circle" | "square"</code></td><td><code class="ys-code">this</code></td><td>Sets the tile shape for all tiles</td></tr><tr><td><code class="ys-code">setColumns(columns)</code></td><td><code class="ys-code">columns</code> - 2-6</td><td><code class="ys-code">this</code></td><td>Sets the number of columns</td></tr><tr><td><code class="ys-code">setSpacing(spacing)</code></td><td><code class="ys-code">spacing</code> - px (&gt;= 0)</td><td><code class="ys-code">this</code></td><td>Sets spacing between tiles</td></tr><tr><td><code class="ys-code">getShape()</code></td><td>-</td><td><code class="ys-code">"circle" | "square"</code></td><td>Gets the current shape</td></tr><tr><td><code class="ys-code">getColumns()</code></td><td>-</td><td><code class="ys-code">number</code></td><td>Gets the current column count</td></tr><tr><td><code class="ys-code">getSpacing()</code></td><td>-</td><td><code class="ys-code">number</code></td><td>Gets the current spacing</td></tr><tr><td><code class="ys-code">addIcon(code, title, thumbnail?, badge?, disabled?, metadata?)</code></td><td>image-first ergonomic API</td><td><code class="ys-code">this</code></td><td>Adds an icon tile (preferred for IconGrid)</td></tr><tr><td><code class="ys-code">addAction(code, title, description?, thumbnail?, disabled?, metadata?)</code></td><td>base order</td><td><code class="ys-code">this</code></td><td>Adds an action (same signature as ActionGrid; <code class="ys-code">description</code> is ignored at render)</td></tr><tr><td><code class="ys-code">addActions(actions)</code></td><td><code class="ys-code">actions[]</code></td><td><code class="ys-code">this</code></td><td>Adds multiple actions (inherited)</td></tr><tr><td><code class="ys-code">removeAction(code)</code></td><td><code class="ys-code">code</code></td><td><code class="ys-code">boolean</code></td><td>Removes an action (inherited)</td></tr><tr><td><code class="ys-code">updateAction(code, updates)</code></td><td><code class="ys-code">code</code>, partial</td><td><code class="ys-code">boolean</code></td><td>Updates an action (inherited)</td></tr><tr><td><code class="ys-code">hasActions()</code></td><td>-</td><td><code class="ys-code">boolean</code></td><td>Whether the grid has any actions</td></tr><tr><td><code class="ys-code">serve()</code> / <code class="ys-code">toJSON()</code></td><td>-</td><td>object</td><td>Serialize/serve (inherited from BaseView)</td></tr></tbody></table></div>
+
+<p>(All other action helpers — <code class="ys-code">getAction</code>, <code class="ys-code">getActions</code>, <code class="ys-code">getActiveActions</code>, <code class="ys-code">sortByTitle</code>, <code class="ys-code">disableAllActions</code>, etc. — are inherited from <code class="ys-code">BaseActionView</code>, same as <code class="ys-code">ActionGridView</code>.)</p>
+
+<h2 id="javascript-sample-code">JavaScript Sample Code</h2>
+
+<h3 id="basic-icon-grid-circle-tiles">Basic icon grid (circle tiles)</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const iconGrid = yeriaApp
+    .createIconGridView('home', 'Accueil')
+    .setIntro('Choisissez un service')
+    .setColumns(4)
+    .addIcon('map',     'Carte',     'https://example.com/icons/map.png')
+    .addIcon('wallet',  'Portefeuille', 'https://example.com/icons/wallet.png', '3')
+    .addIcon('docs',    'Documents', 'https://example.com/icons/docs.png')
+    .addIcon('support', 'Support',   'https://example.com/icons/support.png');
+
+const response = yeriaApp.serve(iconGrid);</code></pre>
+
+<h3 id="square-tiles-a-disabled-action">Square tiles + a disabled action</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const iconGrid = yeriaApp
+    .createIconGridView('tools', 'Outils')
+    .setShape('square')
+    .setColumns(3)
+    .addIcon('scan',    'Scanner', 'scan.png')
+    .addIcon('pay',     'Payer',   'pay.png', 'New')
+    .addIcon('archive', 'Archives','archive.png', undefined, true); // disabled</code></pre>
+
+<h2 id="complete-json-example">Complete JSON Example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "home",
+  "type": "IconGrid",
+  "content": {
+    "title": "Accueil",
+    "intro": "Choisissez un service",
+    "shape": "circle",
+    "columns": 4,
+    "spacing": 12,
+    "actions": [
+      { "code": "map",     "title": "Carte",        "thumbnail": "https://example.com/icons/map.png" },
+      { "code": "wallet",  "title": "Portefeuille", "thumbnail": "https://example.com/icons/wallet.png", "badge": "3" },
+      { "code": "docs",    "title": "Documents",    "thumbnail": "https://example.com/icons/docs.png" },
+      { "code": "support", "title": "Support",      "thumbnail": "https://example.com/icons/support.png", "disabled": true }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2026-06-19T10:00:00.000Z"
+  }
+}</code></pre>
+
+<h2 id="signed-envelope">Signed envelope</h2>
+
+<p><code class="ys-code">serve()</code> wraps the view exactly like every other type — no special handling:</p>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "payload": "{\"appId\":\"my-app\",\"timestamp\":1750329600000,\"view\":{\"id\":\"home\",\"type\":\"IconGrid\",\"content\":{ ... }}}",
+  "signature": "&lt;base64 Ed25519 signature over the payload string&gt;"
+}</code></pre>

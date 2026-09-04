@@ -2,6 +2,7 @@
 Validation utilities for Yeria SDK
 """
 
+import math
 import re
 import json
 from typing import Dict, Any, List, Optional, Callable, Pattern
@@ -16,6 +17,72 @@ from ..types.models import (
     create_validation_error,
 )
 # InvalidParameterError is not used in this file, removed import
+
+
+# Un chemin de media est RELATIF a la base du service du fournisseur.
+#
+# Le renderer le resout contre cette base et refuse tout ce qui est absolu :
+# `http(s)://` et `//host` (aucun hote externe arbitraire, pas de clair),
+# `file://` (lirait les fichiers de l'appareil) et `data:` (charge utile
+# inline non fiable). Il refuse en n'affichant RIEN, la pire facon pour un
+# fournisseur d'apprendre la regle ; les SDK refusent donc ici, a la
+# construction de la vue. Un CDN se joint en repondant a l'URL relative par
+# une 3xx.
+#
+# La regle est « ni schema, ni chemin reseau », pas une liste de schemas :
+# `javascript:`, `mailto:` ou un schema auquel personne n'a pense s'eloignent
+# de la base du service tout autant. Et un antislash vaut un slash, parce que
+# le renderer web resout selon la semantique WHATWG, ou `\\hote/a.jpg` et
+# `https:\\hote` sont absolus.
+_SCHEME_PREFIX = re.compile(r"^[a-z][a-z0-9+.-]*:")
+# WHATWG retire les controles C0 en tete et en queue et TOUT tab ou saut de
+# ligne avant d'analyser : `\x01https://hote` et `ht\ntps://hote` sont absolus
+# dans un navigateur quand un simple prefixe les lit relatifs. Un chemin de
+# media ne porte jamais legitimement un caractere de controle : refus net.
+_CONTROL_CHARACTER = re.compile(r"[\x00-\x1f\x7f]")
+
+MEDIA_FIELD_TYPES = ("photo", "file", "audio", "video")
+
+
+def is_relative_asset_path(value: str) -> bool:
+    if _CONTROL_CHARACTER.search(value):
+        return False
+    trimmed = value.strip().lower().replace("\\", "/")
+    if not trimmed:
+        return False
+    if trimmed.startswith("//"):
+        return False
+    return _SCHEME_PREFIX.match(trimmed) is None
+
+
+def validate_stored_media_paths(field_type: str, field_id: str, value: Any) -> list:
+    """La regle du chemin de media stocke, isolee pour que chaque chemin par
+    lequel passe une ``value`` la fasse tourner : ``add_field`` a la
+    construction, et ``update_field`` — donc ``set_field_value`` et
+    ``inject_data`` — quand la valeur est posee apres coup. Rien a dire pour
+    un champ qui n'est pas un media, ou qui n'a pas de valeur."""
+    errors: list = []
+    if field_type not in MEDIA_FIELD_TYPES or value is None:
+        return errors
+    paths = value if isinstance(value, list) else [value]
+    for path in paths:
+        if not isinstance(path, str) or not is_relative_asset_path(path):
+            errors.append(
+                create_validation_error(
+                    f"Stored media path '{path}' must be relative to the "
+                    "service base (a scheme, a //host and their backslash "
+                    "forms are refused)",
+                    field_id,
+                )
+            )
+    return errors
+
+
+def _is_finite_number(value: Any) -> bool:
+    """Un nombre fini, booleens exclus — l'equivalent de `Number.isFinite`."""
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, (int, float)) and math.isfinite(value)
 
 
 class DataSanitizer:
@@ -66,10 +133,17 @@ class DataSanitizer:
 
     @staticmethod
     def validate_url(url: str) -> bool:
-        """Validate URL format"""
+        """Valide une URL que le client pourra etre amene a ouvrir.
+
+        Seuls ``http`` et ``https`` sont acceptes. La regle etait auparavant
+        implicite — un schema et une localisation reseau — ce qui refusait bien
+        ``javascript:`` mais par accident, et acceptait ``ftp://``. Le SDK JS,
+        lui, se contentait de ``new URL(...)`` et laissait passer
+        ``javascript:``. Les deux enoncent desormais la meme regle.
+        """
         try:
             result = urlparse(url)
-            return all([result.scheme, result.netloc])
+            return result.scheme in ("http", "https") and bool(result.netloc)
         except Exception:
             return False
 
@@ -94,10 +168,17 @@ class DataSanitizer:
 
     @staticmethod
     def validate_number(value: Any) -> bool:
-        """Validate number value"""
-        return isinstance(value, (int, float)) and not (
-            isinstance(value, float) and (value != value or not value == value)
-        )  # Check for NaN
+        """Valide une valeur numerique : un nombre FINI, et pas un booleen.
+
+        Deux ecarts avec le SDK JS, qui refusait deja les deux cas. ``inf`` et
+        ``-inf`` passaient : ``json.dumps`` les ecrit ``Infinity``, que JSON
+        n'admet pas et que ``JSON.parse`` refuse — un payload signe qu'aucun
+        client ne peut relire. Et ``True`` passait pour un nombre, ``bool``
+        etant une sous-classe de ``int`` en Python.
+        """
+        if isinstance(value, bool):
+            return False
+        return isinstance(value, (int, float)) and math.isfinite(value)
 
     @staticmethod
     def validate_plus_code(plus_code: str) -> bool:
@@ -156,14 +237,17 @@ class FieldValidator:
             errors.append(create_validation_error("Field ID is required", field_id))
 
         # Separator fields don't require a label
-        if field_type != "separator" and (not field_label or not field_label.strip()):
+        # Display-only fields (separator, paragraph, spacer) carry no label.
+        if field_type not in ("separator", "paragraph", "spacer") and (
+            not field_label or not field_label.strip()
+        ):
             errors.append(create_validation_error("Field label is required", field_id))
 
         if not field_type or not field_type.strip():
             errors.append(create_validation_error("Field type is required", field_id))
 
-        # Skip validation rules for separator fields (they're visual elements only)
-        if field_type == "separator":
+        # Skip validation rules for display-only fields (visual elements only)
+        if field_type in ("separator", "paragraph", "spacer"):
             return ValidationResult(
                 is_valid=len(errors) == 0,
                 errors=errors,
@@ -226,6 +310,27 @@ class FieldValidator:
                     )
                 )
 
+            # Multi-capture validation (photo / file / audio / video)
+            if params.max_count is not None:
+                # bool is an int subclass in Python — reject it explicitly, since
+                # passing the `multiple` flag here by mistake is the likely slip.
+                if (
+                    isinstance(params.max_count, bool)
+                    or not isinstance(params.max_count, int)
+                    or params.max_count < 1
+                ):
+                    errors.append(
+                        create_validation_error(
+                            "maxCount must be a positive integer", field_id
+                        )
+                    )
+                elif params.max_count > 1 and params.multiple is not True:
+                    warnings.append(
+                        create_validation_error(
+                            "maxCount is ignored unless multiple is true", field_id
+                        )
+                    )
+
             # Dependencies validation
             if params.dependencies and (
                 not isinstance(params.dependencies, list)
@@ -237,6 +342,10 @@ class FieldValidator:
                         field_id,
                     )
                 )
+
+        # Un chemin de media stocke doit etre relatif a la base du service.
+        if params:
+            errors.extend(validate_stored_media_paths(field_type, field_id, params.value))
 
         # Type-specific validation
         if field_type == "email":
@@ -459,6 +568,97 @@ class FieldValidator:
                                 field_id,
                             )
                         )
+
+        elif field_type in ("audio", "video"):
+            if not params or not params.accept or len(params.accept) == 0:
+                errors.append(
+                    create_validation_error(
+                        "Recording fields must specify accepted types", field_id
+                    )
+                )
+
+            # Duration is what bounds the upload size. Video can realistically
+            # exceed a provider's request body limit, so there it is mandatory;
+            # for audio a missing bound is only worth a warning.
+            max_duration = params.max_duration if params else None
+            if max_duration is None:
+                if field_type == "video":
+                    errors.append(
+                        create_validation_error(
+                            "Video fields must specify maxDuration (seconds) — "
+                            "it is what bounds the upload size",
+                            field_id,
+                        )
+                    )
+                else:
+                    warnings.append(
+                        create_validation_error(
+                            "Audio field has no maxDuration; a recording can then "
+                            "grow unbounded",
+                            field_id,
+                        )
+                    )
+            elif not _is_finite_number(max_duration) or max_duration <= 0:
+                errors.append(
+                    create_validation_error(
+                        "maxDuration must be a positive number of seconds", field_id
+                    )
+                )
+
+            min_duration = params.min_duration if params else None
+            if min_duration is not None:
+                if not _is_finite_number(min_duration) or min_duration < 0:
+                    errors.append(
+                        create_validation_error(
+                            "minDuration must be a non-negative number of seconds",
+                            field_id,
+                        )
+                    )
+                elif max_duration is not None and min_duration > max_duration:
+                    errors.append(
+                        create_validation_error(
+                            "minDuration cannot be greater than maxDuration", field_id
+                        )
+                    )
+
+            if params and params.source is not None and params.source not in (
+                "record",
+                "library",
+                "both",
+            ):
+                errors.append(
+                    create_validation_error(
+                        f"Invalid source '{params.source}' "
+                        "(expected 'record', 'library' or 'both')",
+                        field_id,
+                    )
+                )
+
+            if params and params.max_size is not None and (
+                not _is_finite_number(params.max_size) or params.max_size <= 0
+            ):
+                errors.append(
+                    create_validation_error(
+                        "maxSize must be a positive number of bytes", field_id
+                    )
+                )
+
+            if params and params.quality is not None:
+                if field_type == "audio":
+                    warnings.append(
+                        create_validation_error(
+                            "quality only applies to video fields and is ignored here",
+                            field_id,
+                        )
+                    )
+                elif params.quality not in ("low", "medium", "high"):
+                    errors.append(
+                        create_validation_error(
+                            f"Invalid quality '{params.quality}' "
+                            "(expected 'low', 'medium' or 'high')",
+                            field_id,
+                        )
+                    )
 
         elif field_type == "hidden":
             if params and (params.value is None or params.value == ""):

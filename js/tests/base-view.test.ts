@@ -301,4 +301,149 @@ describe('BaseView - Navigation URL Validation', () => {
             }
         });
     });
+
+    describe('view ids are refused', () => {
+        // The client has no registry to resolve a bare id against: a provider
+        // must be stopped at write time rather than discover at run time that
+        // nothing happens.
+        const bareIds = ['step-two', 'orders_list', 'view42'];
+
+        it('setNext() rejects a bare view id', () => {
+            bareIds.forEach(id => {
+                expect(() => view.setNext(id)).toThrow(InvalidParameterError);
+            });
+        });
+
+        it('setPrev() rejects a bare view id', () => {
+            bareIds.forEach(id => {
+                expect(() => view.setPrev(id)).toThrow(InvalidParameterError);
+            });
+        });
+
+        it('still accepts a path relative to the service base', () => {
+            expect(() => view.setNext('/orders/page/2')).not.toThrow();
+            expect(() => view.setPrev('/orders/page/1')).not.toThrow();
+        });
+    });
+
+    describe('setEntry()', () => {
+        it('writes nav.entry', () => {
+            view.setEntry('replace');
+            const json = view.toJSON();
+            expect((json.nav as any).entry).toBe('replace');
+        });
+
+        it('leaves the key out when never called', () => {
+            // The default is 'push'. Emitting it would change the signed bytes
+            // of every existing view for no behavioural gain.
+            view.setNext('/next');
+            const json = view.toJSON();
+            expect((json.nav as any).entry).toBeUndefined();
+        });
+
+        it('rejects anything but push or replace', () => {
+            ['root', 'REPLACE', '', 'pop'].forEach(value => {
+                expect(() => view.setEntry(value as never)).toThrow(InvalidParameterError);
+            });
+        });
+
+        it('survives a round trip through fromJson', () => {
+            view.setEntry('replace').setNext('/orders/page/2');
+            const rehydrated = FormView.fromJson(view.toJSON());
+            const json = rehydrated.toJSON();
+            expect((json.nav as any).entry).toBe('replace');
+            expect((json.nav as any).next).toBe('/orders/page/2');
+        });
+    });
+
+    describe('serialization order', () => {
+        it('emits nav keys in a fixed order, whatever the call order', () => {
+            // The Python SDK writes next/prev/entry in that order. A JS object
+            // keeps its insertion order, so without normalisation the same
+            // view built in the two languages would not sign to the same bytes.
+            const a = new FormView('f', 'F');
+            a.addTextField('name', 'Name', true);
+            a.setPrev('/p/1').setNext('/p/3').setEntry('replace');
+
+            const b = new FormView('f', 'F');
+            b.addTextField('name', 'Name', true);
+            b.setEntry('replace').setNext('/p/3').setPrev('/p/1');
+
+            expect(Object.keys(a.toJSON().nav as object)).toEqual(['next', 'prev', 'entry']);
+            expect(JSON.stringify(a.toJSON().nav)).toBe(JSON.stringify(b.toJSON().nav));
+        });
+    });
+});
+
+describe('setPage — position in the sequence', () => {
+    // `nav.page` dit OÙ l'on est, il ne déplace rien. Des nombres et non une
+    // phrase : le client les met en forme dans sa langue.
+    // Miroir de py/tests/test_navigation.py::TestPagePosition.
+    const aForm = () => new FormView('f', 'F').addTextField('name', 'Name', true);
+
+    it('writes current and total', () => {
+        const nav = (aForm().setPage(1, 2).toJSON() as any).nav;
+        expect(nav.page).toEqual({ current: 1, total: 2 });
+    });
+
+    it('leaves total out of an open-ended sequence', () => {
+        const nav = (aForm().setPage(3).toJSON() as any).nav;
+        expect(nav.page).toEqual({ current: 3 });
+    });
+
+    it('omits the key until it is set', () => {
+        const nav = (aForm().setNext('/page-2').toJSON() as any).nav;
+        expect(nav.page).toBeUndefined();
+    });
+
+    it('refuses a position below one', () => {
+        [0, -1].forEach(bad => {
+            expect(() => aForm().setPage(bad)).toThrow(InvalidParameterError);
+        });
+    });
+
+    it('refuses a non-integer', () => {
+        [1.5, NaN, '2' as never, null as never].forEach(bad => {
+            expect(() => aForm().setPage(bad as number)).toThrow(InvalidParameterError);
+        });
+    });
+
+    it('refuses a total smaller than current', () => {
+        expect(() => aForm().setPage(3, 2)).toThrow(InvalidParameterError);
+    });
+});
+
+describe('setEntry — recul relatif', () => {
+    // Le nombre compte des écrans DU FOURNISSEUR, jamais une profondeur
+    // absolue : celle-ci dépend du chemin par lequel l'utilisateur est arrivé,
+    // que le fournisseur ne connaît pas.
+    // Miroir de py/tests/test_navigation.py::TestNumericEntry.
+    const aForm = () => new FormView('f', 'F').addTextField('name', 'Name', true);
+
+    it('accepts 1, 0 and negatives', () => {
+        [1, 0, -1, -5].forEach(value => {
+            const nav = (aForm().setEntry(value).toJSON() as any).nav;
+            expect(nav.entry).toBe(value);
+        });
+    });
+
+    it('still accepts the two words', () => {
+        (['push', 'replace'] as const).forEach(word => {
+            const nav = (aForm().setEntry(word).toJSON() as any).nav;
+            expect(nav.entry).toBe(word);
+        });
+    });
+
+    it('refuses anything above one', () => {
+        // Empiler est empiler : au-delà, rien de plus ne se dirait.
+        [2, 7].forEach(value => {
+            expect(() => aForm().setEntry(value)).toThrow(InvalidParameterError);
+        });
+    });
+
+    it('refuses a non-integer', () => {
+        [1.5, NaN].forEach(value => {
+            expect(() => aForm().setEntry(value)).toThrow(InvalidParameterError);
+        });
+    });
 });

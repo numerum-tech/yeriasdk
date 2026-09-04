@@ -48,9 +48,53 @@ export interface NotificationConfig {
 }
 
 // Navigation configuration for the views
+/**
+ * How a view sits in the client's navigation stack.
+ *
+ * `next` / `prev` are SIBLINGS in a sequence — the two arrows of a paginated
+ * set of views, drawn by the client. They are never bound to the back gesture:
+ * back undoes time, pagination moves sideways.
+ *
+ * `entry` says how THIS view enters the stack when it is displayed. It is the
+ * answer to "must the user be able to come back to the screen that led here?",
+ * and only the provider knows: a receipt replaces the form it acknowledges,
+ * step 2 of a wizard does not replace step 1.
+ */
+/**
+ * Comment cette vue entre dans la pile.
+ *
+ * Deux mots pour les cas courants, un NOMBRE pour un recul plus profond —
+ * exprimé en écrans DU FOURNISSEUR, jamais en profondeur absolue : celle-ci
+ * dépend du chemin par lequel l'utilisateur est arrivé, que le fournisseur ne
+ * connaît pas.
+ *
+ *   1  = 'push'     la vue s'empile
+ *   0  = 'replace'  elle prend la place de l'écran courant
+ *  -1               elle prend aussi la place de celui d'en dessous
+ *  -n               n+1 écrans laissent la place
+ *
+ * Le dépilement s'arrête TOUJOURS à la racine du service, quel que soit le
+ * nombre : l'entrée du service reste atteignable. C'est ce qui rend un recul
+ * relatif sûr — une même vue peut être servie depuis plusieurs chemins sans
+ * jamais emporter plus que ce qui existe.
+ */
+export type NavigationEntry = 'push' | 'replace' | number;
+
+/**
+ * Où l'on se trouve dans la séquence. Des NOMBRES, pas une phrase : le client
+ * les met en forme dans sa langue (« Page 1 / 2 », « Page 1 of 2 »). `total`
+ * est facultatif — une séquence ouverte n'en connaît pas la fin.
+ */
+export interface PagePosition {
+    current: number;  // 1-based
+    total?: number;
+}
+
 export interface NavigationConfig {
-    next?: string;  // URL or viewId of the next view
-    prev?: string;  // URL or viewId of the previous view
+    next?: string;  // URL of the next view in the sequence
+    prev?: string;  // URL of the previous view in the sequence
+    entry?: NavigationEntry;  // How this view enters the stack (default: 'push')
+    page?: PagePosition;  // Position in the sequence, drawn by the client
 }
 
 // Process context for multi-step workflows
@@ -91,8 +135,34 @@ export interface FieldValidation {
     conditional?: (formData: Record<string, unknown>) => boolean;
 }
 
+/**
+ * Where a photo/audio/video field is allowed to take its content from.
+ *  - `record`  : capture only — camera/microphone, no picking an existing file.
+ *  - `library` : pick only — no capture UI.
+ *  - `both`    : the user chooses (default).
+ * Use `record` when the point is that the content was produced now.
+ */
+export type CaptureSource = 'record' | 'library' | 'both';
+
+/**
+ * Video capture ceiling. An enum rather than raw numbers so the renderer keeps
+ * picking the concrete resolution/bitrate its device actually supports.
+ *  - `low`    ≈ 480p  / ~1 Mbps   → ~7 MB per minute
+ *  - `medium` ≈ 720p  / ~2.5 Mbps → ~19 MB per minute (default)
+ *  - `high`   ≈ 1080p / ~4 Mbps   → ~30 MB per minute
+ * Figures are typical mobile-encoder output, not a guarantee — size the
+ * provider's request body limit with headroom.
+ */
+export type VideoQuality = 'low' | 'medium' | 'high';
+
 export interface FormFieldParams extends FieldValidation {
-    value?: string;
+    /**
+     * Pre-filled value. For media fields (photo/file/audio/video) this is the
+     * URL of a file ALREADY held by the provider — an array when the field is
+     * `multiple`. Combined with `readonly: true` it turns the field into a
+     * viewer for what the server already has, with no capture control.
+     */
+    value?: string | string[];
     options?: Array<{ label: string; value: unknown; selected?: boolean }>;
     accept?: string[];
     live?: boolean;
@@ -102,7 +172,66 @@ export interface FormFieldParams extends FieldValidation {
     readonly?: boolean;
     minDate?: string;      // For date fields: minimum date (YYYY-MM-DD)
     maxDate?: string;      // For date fields: maximum date (YYYY-MM-DD)
+
+    // gps — these three used to reach the payload only through a spread, so
+    // the type never knew about them and neither did anything reading it.
+    altitude?: boolean;    // Include altitude in the captured value
+    maxAccuracy?: number;  // Coarsest fix accepted, in METRES
+    precision?: boolean;   // Legacy high-accuracy flag, superseded by maxAccuracy
+
+    // photo / file / audio / video — multi-capture
+    multiple?: boolean;    // Allow more than one item in this field
+    maxCount?: number;     // Upper bound when `multiple` is true
+
+    // audio / video — capture constraints
+    maxDuration?: number;  // Seconds. Required for video: it is what bounds upload size
+    minDuration?: number;  // Seconds. Rejects an accidental tap-and-release recording
+    source?: CaptureSource;
+    quality?: VideoQuality; // Video only
+    maxSize?: number;      // Bytes. Client refuses to upload past this, before sending
+
+    // select — comment presenter les choix. Voir SelectDisplay.
+    display?: SelectDisplay;
+
+    // paragraph — displayed text, never an input. See ParagraphParams.
+    size?: ParagraphSize | SpacerSize;
+    bold?: boolean;
+    italic?: boolean;
 }
+
+/**
+ * Comment un `select` presente ses options. Une PREFERENCE d'affichage, pas
+ * un type de champ : le sens est le meme dans les deux cas — un seul choix
+ * parmi plusieurs.
+ *
+ * - `dropdown` (defaut) : le champ ouvre une feuille de selection. Le bon
+ *   choix des qu'il y a beaucoup d'options.
+ * - `radio` : toutes les options a plat dans le formulaire, une seule
+ *   cochable. Le bon choix quand elles sont peu nombreuses et qu'on veut
+ *   pouvoir les comparer sans rien ouvrir.
+ *
+ * Un client qui ignore cette cle retombe sur `dropdown` : la vue reste
+ * utilisable, elle est seulement moins bien presentee.
+ */
+export type SelectDisplay = 'dropdown' | 'radio';
+
+/**
+ * Size of a `paragraph` block. A SIZE, not a role: the SDK does not decide
+ * whether a block is a heading, an instruction or a caption — the provider
+ * does, by picking a size and, if wanted, an emphasis.
+ *
+ * Four steps, matching the app's own type scale:
+ *   'xl' — 24px   'lg' — 18px   'md' — 14px (default)   'sm' — 12px
+ *
+ * A closed list rather than a free number: an open scale would let every
+ * provider invent its own typography, and the renderer could no longer keep
+ * one service looking like the next.
+ */
+export type ParagraphSize = 'xl' | 'lg' | 'md' | 'sm';
+
+/// Trois crans d'espacement, pas une mesure : le fournisseur demande une
+/// respiration, le client décide de sa hauteur.
+export type SpacerSize = 'sm' | 'md' | 'lg';
 
 // Configuration for actions
 export interface ActionConfig {
@@ -168,10 +297,20 @@ export interface CardAction {
 
 export interface CardContent {
     title: string;
-    subtitle?: string;
+    /**
+     * Ligne de contexte sous le titre — même clé et même rôle que l'`intro`
+     * des onze autres vues. Elle s'appelait `subtitle` ; `setSubtitle` en
+     * reste l'alias.
+     */
+    intro?: string;
     description?: string;
     badge?: string;
     image?: CardImage;
+    /**
+     * Intitulé du bloc de statistiques. Absent = pas de titre : le client ne
+     * dessine que ce que le fournisseur a posé, comme pour `CardSection`.
+     */
+    statsHeading?: string;
     stats: CardStat[];
     sections: CardSection[];
     actions: CardAction[];
@@ -197,7 +336,8 @@ export interface CarouselSettings {
 
 export interface CarouselContent {
     title: string;
-    subtitle?: string;
+    /** Voir {@link CardContent.intro} — `setSubtitle` en reste l'alias. */
+    intro?: string;
     slides: CarouselSlide[];
     settings?: CarouselSettings;
 }
@@ -446,6 +586,30 @@ export interface SubmitAction {
     confirmMessage?: string;   // Optional confirmation: "Are you sure?"
 }
 
+/**
+ * Second action of a form, rendered under the submit button, in the same
+ * footer bar and with a secondary weight.
+ *
+ * `mode` decides what happens to what the user has typed, and it is explicit
+ * on purpose — guessing would be a bug:
+ *   'navigate' : call `url`, render whatever view comes back. Entered values
+ *                are DISCARDED. This is "Skip", "Cancel", "Come back later".
+ *   'submit'   : send the current values to `url` with `method`. A second
+ *                destination for the same data — "Save as draft".
+ *
+ * `validate` says whether the form must be valid first. It defaults to false
+ * for 'navigate' (a Skip blocked by an empty required field would be absurd)
+ * and to true for 'submit'.
+ */
+export interface SecondaryAction {
+    text: string;
+    url: string;
+    mode?: 'navigate' | 'submit';   // default: 'navigate'
+    method?: HttpMethod;            // 'submit' only, default POST
+    validate?: boolean;             // default: mode === 'submit'
+    confirmMessage?: string;
+}
+
 // Zod validation schemas
 export const FieldSchema = z.object({
     fieldType: z.string(),
@@ -466,6 +630,13 @@ export const FieldSchema = z.object({
     helpText: z.string().optional(),
     disabled: z.boolean().optional(),
     readonly: z.boolean().optional(),
+    multiple: z.boolean().optional(),
+    maxCount: z.number().optional(),
+    maxDuration: z.number().optional(),
+    minDuration: z.number().optional(),
+    source: z.enum(['record', 'library', 'both']).optional(),
+    quality: z.enum(['low', 'medium', 'high']).optional(),
+    maxSize: z.number().optional(),
 });
 
 export const ActionSchema = z.object({
@@ -602,8 +773,7 @@ export interface QRScanContent {
         errorMessage?: string;        // Error message to show user
     };
     preview?: {                       // Preview before submit (requires submit button)
-        enabled?: boolean;
-        editable?: boolean;           // Allow manual correction
+        enabled?: boolean;            // Echo the scanned value, read-only
         label?: string;               // Field label in preview: "Scanned Code"
     };
 }

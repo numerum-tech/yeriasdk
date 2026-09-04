@@ -1,0 +1,232 @@
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">ReaderView</code> component is used to display rich, structured content for reading. It supports various content elements including paragraphs, images, markdown content, lists, links, tables, code blocks, quotes, and custom elements. All HTML content is sanitized to prevent XSS attacks.</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the reader view</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Always <code class="ys-code">"Reader"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">ReaderContent</code></td><td>Yes</td><td>Reader content object</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Title of the reader view</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Introduction text displayed before elements</td></tr><tr><td><code class="ys-code">content.elements</code></td><td><code class="ys-code">ReaderElement[]</code></td><td>Yes</td><td>Array of content elements (at least one required)</td></tr><tr><td><code class="ys-code">content.elements[].type</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Element type: <code class="ys-code">"paragraph"</code>, <code class="ys-code">"subtitle"</code>, <code class="ys-code">"image"</code>, <code class="ys-code">"markdown"</code>, <code class="ys-code">"list"</code>, <code class="ys-code">"link"</code>, <code class="ys-code">"table"</code>, <code class="ys-code">"code"</code>, <code class="ys-code">"quote"</code>, <code class="ys-code">"separator"</code>, <code class="ys-code">"custom"</code></td></tr><tr><td><code class="ys-code">content.elements[].text</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>Text content (for paragraph, subtitle)</td></tr><tr><td><code class="ys-code">content.elements[].url</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>URL (for image, link)</td></tr><tr><td><code class="ys-code">content.elements[].alt</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Alt text for images</td></tr><tr><td><code class="ys-code">content.elements[].caption</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Caption for images</td></tr><tr><td><code class="ys-code">content.elements[].pages</code></td><td><code class="ys-code">MarkdownPage[]</code></td><td>Yes*</td><td>Markdown pages (for markdown type)</td></tr><tr><td><code class="ys-code">content.elements[].pages[].content</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Sanitized HTML content</td></tr><tr><td><code class="ys-code">content.elements[].pages[].raw</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Original markdown text</td></tr><tr><td><code class="ys-code">content.elements[].pages[].sanitized</code></td><td><code class="ys-code">boolean</code></td><td>Yes</td><td>Whether content was sanitized</td></tr><tr><td><code class="ys-code">content.elements[].items</code></td><td><code class="ys-code">string[]</code></td><td>Yes*</td><td>List items (for list type)</td></tr><tr><td><code class="ys-code">content.elements[].ordered</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Whether list is ordered (default: false)</td></tr><tr><td><code class="ys-code">content.elements[].description</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Description for links</td></tr><tr><td><code class="ys-code">content.elements[].headers</code></td><td><code class="ys-code">string[]</code></td><td>Yes*</td><td>Table headers (for table type)</td></tr><tr><td><code class="ys-code">content.elements[].rows</code></td><td><code class="ys-code">string[][]</code></td><td>Yes*</td><td>Table rows (for table type)</td></tr><tr><td><code class="ys-code">content.elements[].code</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>Code content (for code type)</td></tr><tr><td><code class="ys-code">content.elements[].language</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Programming language for code blocks</td></tr><tr><td><code class="ys-code">content.elements[].author</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Quote author</td></tr><tr><td><code class="ys-code">content.elements[].source</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Quote source</td></tr><tr><td><code class="ys-code">content.elements[].kind</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>Custom element kind (for custom type)</td></tr><tr><td><code class="ys-code">content.elements[].data</code></td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Yes*</td><td>Custom element data (for custom type)</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Process identifier for multi-step workflows</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>No</td><td>View metadata (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Introduction text</td><td><code class="ys-code">this</code></td><td>Sets the introduction text displayed before elements</td></tr><tr><td><code class="ys-code">addParagraph(text)</code></td><td><code class="ys-code">text</code> - Paragraph text</td><td><code class="ys-code">this</code></td><td>Adds a paragraph element</td></tr><tr><td><code class="ys-code">addSubTitle(text)</code></td><td><code class="ys-code">text</code> - Subtitle text</td><td><code class="ys-code">this</code></td><td>Adds a subtitle element</td></tr><tr><td><code class="ys-code">addImage(url, alt?, caption?)</code></td><td><code class="ys-code">url</code> - Image URL<br><code class="ys-code">alt</code> - Alt text<br><code class="ys-code">caption</code> - Image caption</td><td><code class="ys-code">this</code></td><td>Adds an image element</td></tr><tr><td><code class="ys-code">addMarkdown(markdownText, options?)</code></td><td><code class="ys-code">markdownText</code> - Markdown content<br><code class="ys-code">options</code> - Options (sanitize)</td><td><code class="ys-code">this</code></td><td>Adds markdown content (sanitized by default)</td></tr><tr><td><code class="ys-code">addListField(items, ordered?)</code></td><td><code class="ys-code">items</code> - Array of strings<br><code class="ys-code">ordered</code> - Ordered list flag</td><td><code class="ys-code">this</code></td><td>Adds a list element (ordered or unordered)</td></tr><tr><td><code class="ys-code">addLink(url, text, description?)</code></td><td><code class="ys-code">url</code> - Link URL<br><code class="ys-code">text</code> - Link text<br><code class="ys-code">description</code> - Optional description</td><td><code class="ys-code">this</code></td><td>Adds a link element</td></tr><tr><td><code class="ys-code">addTable(headers, rows)</code></td><td><code class="ys-code">headers</code> - Array of header strings<br><code class="ys-code">rows</code> - Array of row arrays</td><td><code class="ys-code">this</code></td><td>Adds a table element</td></tr><tr><td><code class="ys-code">addCodeBlock(code, language?)</code></td><td><code class="ys-code">code</code> - Code content<br><code class="ys-code">language</code> - Programming language</td><td><code class="ys-code">this</code></td><td>Adds a code block element</td></tr><tr><td><code class="ys-code">addQuote(text, author?, source?)</code></td><td><code class="ys-code">text</code> - Quote text<br><code class="ys-code">author</code> - Quote author<br><code class="ys-code">source</code> - Quote source</td><td><code class="ys-code">this</code></td><td>Adds a quote element</td></tr><tr><td><code class="ys-code">addSeparator()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Adds a separator element</td></tr><tr><td><code class="ys-code">addCustomElement(type, data)</code></td><td><code class="ys-code">type</code> - Element type<br><code class="ys-code">data</code> - Element data object</td><td><code class="ys-code">this</code></td><td>Adds a custom element</td></tr><tr><td><code class="ys-code">getElementsByType(type)</code></td><td><code class="ys-code">type</code> - Element type</td><td><code class="ys-code">ReaderElement[]</code></td><td>Gets all elements of a specific type</td></tr><tr><td><code class="ys-code">removeElement(index)</code></td><td><code class="ys-code">index</code> - Element index</td><td><code class="ys-code">boolean</code></td><td>Removes an element by index</td></tr><tr><td><code class="ys-code">insertElement(index, element)</code></td><td><code class="ys-code">index</code> - Insert position<br><code class="ys-code">element</code> - ReaderElement</td><td><code class="ys-code">boolean</code></td><td>Inserts an element at a specific index</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Serves the view with validation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Returns JSON representation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - State key<br><code class="ys-code">value</code> - State value</td><td><code class="ys-code">void</code></td><td>Sets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - State key</td><td><code class="ys-code">unknown</code></td><td>Gets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL or path of the next view</td><td><code class="ys-code">this</code></td><td>Forward control of a paginated sequence, drawn by the client — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL or path of the previous view</td><td><code class="ys-code">this</code></td><td>Backward control of the same sequence. NOT where the back gesture leads — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, or an integer &lt;= 1</td><td><code class="ys-code">this</code></td><td>How this view enters the client's navigation stack (default: <code class="ys-code">push</code>) — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - 1-based position<br><code class="ys-code">total</code> - sequence length, when known</td><td><code class="ys-code">this</code></td><td>Where this view sits in its sequence; the client draws the indicator — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Process ID<br><code class="ys-code">context</code> - Process context</td><td><code class="ys-code">this</code></td><td>Sets process context (inherited from BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">JavaScript Sample Code</h2>
+
+<h3 id="basic-reader-view">Basic Reader View</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const reader = yeriaApp
+    .createReaderView('welcome', 'Welcome to Our App')
+    .setIntro('Discover our key features')
+    .addParagraph('YeriaApp allows you to generate dynamic screens from the backend.')
+    .addSubTitle('Key Features')
+    .addListField([
+        'Dynamic forms with validation',
+        'Rich reading views',
+        'Ed25519 signatures for integrity'
+    ]);
+
+const response = yeriaApp.serve(reader);</code></pre>
+
+<h3 id="reader-view-with-images">Reader View with Images</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const reader = yeriaApp
+    .createReaderView('product-info', 'Product Information')
+    .setIntro('Learn about our featured product')
+    .addImage('https://example.com/product.jpg', 'Product Image', 'Our featured product')
+    .addParagraph('This product features advanced technology and modern design.')
+    .addSubTitle('Specifications')
+    .addListField([
+        'High-performance processor',
+        'Long battery life',
+        'Modern design'
+    ], true);</code></pre>
+
+<h3 id="reader-view-with-markdown">Reader View with Markdown</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const reader = yeriaApp
+    .createReaderView('article', 'Article Title')
+    .setIntro('Read our latest article')
+    .addMarkdown(`
+# Introduction
+
+This is a **markdown** article with *formatting*.
+
+## Features
+
+- Feature 1
+- Feature 2
+- Feature 3
+
+[Learn more](https://example.com)
+    `, { sanitize: true });</code></pre>
+
+<h3 id="reader-view-with-table">Reader View with Table</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const reader = yeriaApp
+    .createReaderView('pricing', 'Pricing Plans')
+    .setIntro('Choose the plan that fits your needs')
+    .addTable(
+        ['Plan', 'Price', 'Features'],
+        [
+            ['Basic', '$9/month', '5 projects'],
+            ['Pro', '$29/month', 'Unlimited projects'],
+            ['Enterprise', 'Custom', 'Custom features']
+        ]
+    );</code></pre>
+
+<h3 id="reader-view-with-code-block">Reader View with Code Block</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const reader = yeriaApp
+    .createReaderView('tutorial', 'Code Tutorial')
+    .setIntro('Learn how to use our API')
+    .addCodeBlock(
+        `function greet(name) {
+    return \`Hello, \${name}!\`;
+}`,
+        'javascript'
+    )
+    .addParagraph('This function greets a user by name.');</code></pre>
+
+<h3 id="reader-view-with-quote">Reader View with Quote</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const reader = yeriaApp
+    .createReaderView('testimonial', 'Customer Testimonial')
+    .setIntro('What our customers say')
+    .addQuote(
+        'This product has transformed how we work.',
+        'John Doe',
+        'CEO, Company Inc.'
+    );</code></pre>
+
+<h3 id="reader-view-with-links">Reader View with Links</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const reader = yeriaApp
+    .createReaderView('resources', 'Helpful Resources')
+    .setIntro('External resources you might find useful')
+    .addLink('https://example.com/docs', 'Documentation', 'Complete API documentation')
+    .addLink('https://example.com/support', 'Support', 'Get help from our team')
+    .addSeparator()
+    .addParagraph('For more information, contact us.');</code></pre>
+
+<h3 id="reader-view-with-custom-elements">Reader View with Custom Elements</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const reader = yeriaApp
+    .createReaderView('custom-content', 'Custom Content')
+    .setIntro('Custom content display')
+    .addCustomElement('chart', {
+        type: 'bar',
+        data: [10, 20, 30, 40],
+        labels: ['Q1', 'Q2', 'Q3', 'Q4']
+    })
+    .addCustomElement('widget', {
+        widgetId: 'weather',
+        location: 'Paris'
+    });</code></pre>
+
+<h3 id="complex-reader-view">Complex Reader View</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const reader = yeriaApp
+    .createReaderView('guide', 'User Guide')
+    .setIntro('Welcome to our comprehensive guide')
+    .addSubTitle('Getting Started')
+    .addParagraph('Follow these steps to get started.')
+    .addListField([
+        'Create an account',
+        'Verify your email',
+        'Complete your profile'
+    ])
+    .addSeparator()
+    .addSubTitle('Advanced Features')
+    .addMarkdown(`
+### Feature 1
+
+Description of feature 1.
+
+### Feature 2
+
+Description of feature 2.
+    `)
+    .addImage('https://example.com/diagram.png', 'Architecture Diagram')
+    .addSeparator()
+    .addLink('https://example.com/contact', 'Need Help?', 'Contact our support team');</code></pre>
+
+<h2 id="complete-json-example">Complete JSON Example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "user-guide",
+  "type": "Reader",
+  "content": {
+    "title": "User Guide",
+    "intro": "Welcome to our comprehensive guide",
+    "elements": [
+      {
+        "type": "subtitle",
+        "text": "Getting Started"
+      },
+      {
+        "type": "paragraph",
+        "text": "Follow these steps to get started with our application."
+      },
+      {
+        "type": "list",
+        "items": [
+          "Create an account",
+          "Verify your email",
+          "Complete your profile",
+          "Start using the app"
+        ],
+        "ordered": false
+      },
+      {
+        "type": "separator"
+      },
+      {
+        "type": "subtitle",
+        "text": "Advanced Features"
+      },
+      {
+        "type": "markdown",
+        "content": "### Feature 1\n\nDescription of feature 1.\n\n### Feature 2\n\nDescription of feature 2."
+      },
+      {
+        "type": "image",
+        "src": "https://example.com/diagram.png",
+        "alt": "Architecture Diagram",
+        "caption": "System Architecture"
+      },
+      {
+        "type": "table",
+        "headers": ["Feature", "Status", "Version"],
+        "rows": [
+          ["Feature A", "Active", "1.0"],
+          ["Feature B", "Beta", "0.9"],
+          ["Feature C", "Planned", "TBD"]
+        ]
+      },
+      {
+        "type": "code",
+        "language": "javascript",
+        "code": "function example() {\n  return 'Hello World';\n}"
+      },
+      {
+        "type": "quote",
+        "text": "This is an important quote",
+        "author": "John Doe"
+      },
+      {
+        "type": "link",
+        "href": "https://example.com/contact",
+        "text": "Need Help?",
+        "description": "Contact our support team"
+      }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

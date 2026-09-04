@@ -4,7 +4,9 @@ Base view class for all Yeria views
 
 import json
 import copy
-from typing import Dict, Any, Optional, List
+import math
+import re
+from typing import Dict, Any, Optional, List, Union
 from abc import ABC
 
 from ..types.models import (
@@ -34,7 +36,7 @@ class BaseView(ABC):
     """Abstract base for every Yeria SGUI view (Form, Reader, Card, Map, ...).
 
     Holds the state common to all views: identity (id / type / process_id),
-    navigation (set_next / set_prev), metadata, and the serialization
+    navigation (set_next / set_prev / set_entry / set_page), metadata, and the serialization
     (build / to_json) that produces the view's JSON description. Concrete views
     are created via the YeriaApp / YeriaUI factory methods, populated, then
     signed by their serialized output. Instances are mutable, per-request
@@ -111,10 +113,13 @@ class BaseView(ABC):
                     create_validation_error("Form must have at least one field")
                 )
             else:
-                # Exclude separator fields from "at least one field" validation
+                # A form made only of rules and blank space is not a form.
+                # `paragraph` is deliberately NOT excluded here: it at least
+                # says something, and excluding it would refuse forms that
+                # providers serve today.
                 non_separator_fields = [
                     f for f in self.content["fields"]
-                    if f.get("fieldType") != "separator"
+                    if f.get("fieldType") not in ("separator", "spacer")
                 ]
                 if len(non_separator_fields) == 0:
                     errors.append(
@@ -165,28 +170,22 @@ class BaseView(ABC):
         elif self.type == "Message":
             if isinstance(self.content, dict):
                 message_content = self.content
+                # Les trois textes ont des roles distincts : `title` nomme la
+                # fenetre, `intro` est la premiere ligne — un sous-titre — et
+                # `body` est ce que le message DIT. Un message sans corps n'a
+                # rien a dire, d'ou l'exigence ; l'intro reste facultative.
                 has_body = (
                     isinstance(message_content.get("body"), str)
                     and len(message_content.get("body", "").strip()) > 0
                 )
-                has_intro = (
-                    isinstance(message_content.get("intro"), str)
-                    and len(message_content.get("intro", "").strip()) > 0
-                )
-
-                if not has_body and not has_intro:
+                if not has_body:
                     errors.append(
-                        create_validation_error(
-                            "Message view must define a body or an intro"
-                        )
+                        create_validation_error("Message view must define a body")
                     )
 
-                if not message_content.get("confirm"):
-                    errors.append(
-                        create_validation_error(
-                            "Message view must define a primary action"
-                        )
-                    )
+                # Aucune action n'est exigee : une boite sans bouton declare se
+                # ferme par un « OK » que le client dessine, comme une MsgBox
+                # sans jeu de boutons.
             else:
                 errors.append(create_validation_error("Message view content is invalid"))
 
@@ -383,11 +382,45 @@ class BaseView(ABC):
             result["nav"] = {
                 "next": self._navigation.next,
                 "prev": self._navigation.prev,
+                "entry": self._navigation.entry,
+                "page": self._navigation.page,
             }
+
+        # `nan` et `±inf` n'ont pas de forme JSON : `json.dumps` ecrit `NaN`,
+        # le JS ecrit `null`, et une charge utile signee qui porte l'un ou
+        # l'autre est illisible par tout client. Les constructeurs refusent
+        # la ou ils connaissent le champ ; ceci est le filet sous eux tous,
+        # au seul point par lequel passe toute charge utile.
+        non_finite = self._find_non_finite_number(result, "")
+        if non_finite is not None:
+            raise ViewValidationError(
+                self.id, self.type, [f"payload contains a non-finite number at {non_finite}"]
+            )
 
         # Drop None-valued keys so the payload matches the JS SDK, whose
         # JSON.stringify omits undefined fields (see _strip_none).
         return self._strip_none(result)
+
+    @staticmethod
+    def _find_non_finite_number(value: Any, path: str) -> Optional[str]:
+        """Chemin du premier nombre non fini, ou None. `bool` est un `int`
+        mais n'est pas un nombre ici."""
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, float):
+            return None if math.isfinite(value) else (path or "payload")
+        if isinstance(value, dict):
+            for k, v in value.items():
+                hit = BaseView._find_non_finite_number(v, f"{path}.{k}" if path else str(k))
+                if hit is not None:
+                    return hit
+            return None
+        if isinstance(value, (list, tuple)):
+            for i, v in enumerate(value):
+                hit = BaseView._find_non_finite_number(v, f"{path}[{i}]")
+                if hit is not None:
+                    return hit
+        return None
 
     def to_json(self) -> Dict[str, Any]:
         """Return JSON representation of the view (delegates to build())"""
@@ -441,7 +474,20 @@ class BaseView(ABC):
             inst._metadata = None
 
         nav = json_view.get("nav")
-        inst._navigation = NavigationConfig(next=nav.get("next"), prev=nav.get("prev")) if isinstance(nav, dict) else None
+        # Every field of the config, `page` included. Listing three of the four
+        # dropped the pagination position on the way back in, so re-serving a
+        # rehydrated view silently lost the indicator and did not sign the same
+        # as the payload it came from.
+        inst._navigation = (
+            NavigationConfig(
+                next=nav.get("next"),
+                prev=nav.get("prev"),
+                entry=nav.get("entry"),
+                page=nav.get("page"),
+            )
+            if isinstance(nav, dict)
+            else None
+        )
 
         proc = json_view.get("process")
         if isinstance(proc, dict) and proc.get("processId"):
@@ -568,11 +614,39 @@ class BaseView(ABC):
 
         return trimmed
 
-    def set_next(self, url: str) -> "BaseView":
-        """Set next view (navigation) with URL validation"""
-        target = self._assert_navigation_target(
-            "url", url, allow_relative=True, allow_view_id=True
+    def _assert_addressable_target(self, field_name: str, target: str) -> str:
+        """A sequence target must be addressable: an absolute URL, or a path the
+        client can resolve against the service base.
+
+        A bare token (``step-two``) is refused. On the wire it is
+        indistinguishable from a relative path, so the validator accepts it —
+        but the client has no registry of view ids to resolve it against, and a
+        provider writing one would get a silent 404 instead of an error.
+        """
+        trimmed = self._assert_navigation_target(
+            field_name, target, allow_relative=True, allow_view_id=False
         )
+
+        addressable = bool(re.match(r"^https?://", trimmed, re.IGNORECASE)) or "/" in trimmed
+        if not addressable:
+            raise InvalidParameterError(
+                field_name,
+                target,
+                'Navigation target must be a URL or a path (e.g. "/orders/page/2"), '
+                "not a bare view id",
+            )
+
+        return trimmed
+
+    def set_next(self, url: str) -> "BaseView":
+        """Next view of a paginated sequence — the client draws the control.
+
+        A sibling, not a destination for the back gesture. Moving to it
+        REPLACES the current view unless the view reached declares
+        ``entry='push'``: without that, leafing through forty pages stacks
+        forty screens and back becomes a tunnel.
+        """
+        target = self._assert_addressable_target("url", url)
 
         if not self._navigation:
             self._navigation = NavigationConfig()
@@ -580,14 +654,82 @@ class BaseView(ABC):
         return self
 
     def set_prev(self, url: str) -> "BaseView":
-        """Set previous view (navigation) with URL validation"""
-        target = self._assert_navigation_target(
-            "url", url, allow_relative=True, allow_view_id=True
-        )
+        """Previous view of a paginated sequence — the client draws the control.
+
+        Symmetric with :meth:`set_next`. This is NOT where the back gesture
+        leads: the client always keeps the view served by the service base URL
+        at the bottom of the stack, and back walks down to it.
+        """
+        target = self._assert_addressable_target("url", url)
 
         if not self._navigation:
             self._navigation = NavigationConfig()
         self._navigation.prev = target
+        return self
+
+    def set_entry(self, entry: Union[str, int]) -> "BaseView":
+        """How this view enters the client's navigation stack.
+
+        ``'push'`` (default) stacks on top of the screen that led here, and
+        back returns to it. ``'replace'`` takes that screen's place, so back
+        skips over it.
+
+        Declare ``replace`` on what acknowledges a completed action — the
+        receipt of a submitted form — so the user cannot walk back onto a
+        screen that has already done its work. Do NOT declare it on the next
+        step of a wizard: step 2 replacing step 1 would make the assistant
+        impossible to walk back up. The client cannot tell those apart, which
+        is why the default stays ``push``.
+        """
+        if isinstance(entry, bool) or not isinstance(entry, int):
+            if entry not in ("push", "replace"):
+                raise InvalidParameterError(
+                    "entry", entry, "entry must be 'push', 'replace', or an integer <= 1"
+                )
+        elif entry > 1:
+            # Au-dessus de 1, rien de plus ne se dirait : empiler est empiler.
+            # Refuse plutot qu'accepte en silence.
+            raise InvalidParameterError(
+                "entry",
+                entry,
+                "entry must be an integer <= 1 (1 = push, 0 = replace, -n = deeper recoil)",
+            )
+
+        if not self._navigation:
+            self._navigation = NavigationConfig()
+        self._navigation.entry = entry
+        return self
+
+    def set_page(self, current: int, total: Optional[int] = None) -> "BaseView":
+        """State where this view sits in its sequence.
+
+        Le client dessine un indicateur de position a cote des controles
+        ``next`` / ``prev``. Des NOMBRES, pas une phrase : le client les met en
+        forme dans la langue du lecteur. Omettre ``total`` quand la sequence
+        n'a pas de fin connue — le client n'affiche alors que la position.
+
+        Purement informatif : le deplacement passe toujours par ``set_next`` /
+        ``set_prev``.
+        """
+        if isinstance(current, bool) or not isinstance(current, int) or current < 1:
+            raise InvalidParameterError(
+                "current", current, "current must be an integer >= 1"
+            )
+        if total is not None:
+            if isinstance(total, bool) or not isinstance(total, int) or total < 1:
+                raise InvalidParameterError(
+                    "total", total, "total must be an integer >= 1"
+                )
+            if total < current:
+                raise InvalidParameterError(
+                    "total", total, "total cannot be smaller than current"
+                )
+
+        if not self._navigation:
+            self._navigation = NavigationConfig()
+        self._navigation.page = (
+            {"current": current} if total is None else {"current": current, "total": total}
+        )
         return self
 
     def set_process(

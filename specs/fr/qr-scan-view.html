@@ -1,0 +1,214 @@
+<h2 id="description">Description</h2>
+
+<p>Le composant <code class="ys-code">QRScanView</code> fournit une interface de scanner de codes QR. L'application mobile prend en charge toute l'implémentation du scanner (caméra, torche, mise au point, formats, interface), tandis que la vue se contente de décrire ce qu'il faut scanner et où soumettre le résultat.</p>
+
+<p><strong>Principes de conception :</strong></p>
+
+<ul><li>L'application mobile prend en charge TOUTE l'implémentation du scanner</li><li>La vue décrit uniquement ce qu'il faut scanner et où soumettre</li><li>Le nom du champ est TOUJOURS "qrData" (non configurable)</li><li>Soumission automatique par défaut : scan → POST immédiat de <code class="ys-code">{ qrData: "scanned-value" }</code></li><li>Un bouton de soumission désactive la soumission automatique, pour les parcours à confirmation manuelle</li><li>L'aperçu est <strong>en lecture seule</strong> : une valeur que l'utilisateur pourrait ressaisir permettrait de publier n'importe quoi comme si cela avait été scanné</li></ul>
+
+<p><strong>Convention de soumission :</strong></p>
+
+<ul><li>Soumission automatique : POST vers <code class="ys-code">{service.baseUrl}/{viewId}</code> avec <code class="ys-code">{ qrData: "scanned-value" }</code></li><li>Avec bouton : l'utilisateur scanne, consulte l'aperçu (s'il est activé), puis appuie sur le bouton pour soumettre</li></ul>
+
+<p><strong>Contrat de comportement côté client</strong></p>
+
+<p>Le moteur de rendu résout les trois indicateurs dans cet ordre — le premier qui s'applique l'emporte :</p>
+
+<ol><li><code class="ys-code">submit</code> est défini → un bouton est affiché, la soumission automatique est désactivée (le SDK force également <code class="ys-code">autoSubmit: false</code>)</li><li><code class="ys-code">preview.enabled</code> vaut true → la valeur scannée est affichée et la soumission attend l'appui</li><li>sinon <code class="ys-code">autoSubmit</code> (true par défaut) → un scan valide est envoyé immédiatement</li></ol>
+
+<p><strong>Scans refusés :</strong> lorsqu'une valeur scannée échoue à la <code class="ys-code">validation</code>, le client <strong>arrête le scanner</strong> et affiche un panneau d'échec portant <code class="ys-code">validation.errorMessage</code>. Il ne poursuit pas silencieusement le balayage — un code qui enfreint les règles les enfreindrait de nouveau à chaque image — et il ne renvoie jamais la valeur refusée à l'utilisateur. Deux conséquences pour le fournisseur :</p>
+
+<ul><li>Rédigez <code class="ys-code">errorMessage</code> de façon à énoncer la règle (« doit commencer par PROD- suivi de 6 à 12 chiffres »), et pas simplement « code invalide » : c'est la seule information visible par l'utilisateur.</li><li>La seule issue pour l'utilisateur est de scanner à nouveau ou de quitter la vue.</li></ul>
+
+<p><strong>Message de confirmation.</strong> <code class="ys-code">submit.confirmMessage</code> est rendu comme <strong>texte d'aide sur l'écran de résultat du scan</strong>, à côté de la valeur scannée — et non comme une boîte de dialogue modale. Sur une vue QRScan, l'appui sur le bouton de soumission (avec la valeur sous les yeux de l'utilisateur) constitue déjà l'étape de confirmation ; une boîte de dialogue poserait deux fois la même question. Servez-vous-en pour indiquer ce que l'utilisateur doit vérifier avant d'appuyer (« comparez la référence avec celle imprimée sur l'étiquette »). Le champ conserve son nom par cohérence avec <code class="ys-code">SubmitAction</code> dans les autres vues ; seul son rendu en QRScan diffère.</p>
+
+<p><strong>Quand activer l'aperçu.</strong> Il affiche la valeur brute scannée : il n'est donc utile que si cette valeur signifie quelque chose pour l'utilisateur — une référence de billet, un numéro de facture imprimé à côté du code, ou un lot de codes assez proches physiquement pour que la caméra lise le mauvais. Pour des charges utiles opaques (blobs signés, UUID, URL), laissez-le désactivé et soumettez automatiquement, puis renvoyez une vue décrivant ce à quoi le code correspond : l'utilisateur confirme ainsi un sens plutôt qu'une chaîne de caractères. Afficher une charge utile opaque ou sensible expose au regard indiscret sans aucun bénéfice.</p>
+
+<h2 id="fields-description">Description des champs</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Identifiant unique de la vue de scan QR</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Toujours <code class="ys-code">"QRScan"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">QRScanContent</code></td><td>Oui</td><td>Objet de contenu du scan QR</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Titre de la vue affiché à l'utilisateur</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Texte d'instruction (par exemple « Dirigez la caméra vers le code QR »)</td></tr><tr><td><code class="ys-code">content.autoSubmit</code></td><td><code class="ys-code">boolean</code></td><td>Non</td><td>Soumission automatique après le scan (par défaut : true)</td></tr><tr><td><code class="ys-code">content.submit</code></td><td><code class="ys-code">QRScanSubmitAction</code></td><td>Non</td><td>Configuration du bouton de soumission (désactive autoSubmit lorsqu'elle est définie)</td></tr><tr><td><code class="ys-code">content.submit.text</code></td><td><code class="ys-code">string</code></td><td>Oui*</td><td>Texte du bouton (requis si submit est défini)</td></tr><tr><td><code class="ys-code">content.submit.method</code></td><td><code class="ys-code">HttpMethod</code></td><td>Non</td><td>Méthode HTTP (toujours POST pour QRScan)</td></tr><tr><td><code class="ys-code">content.submit.confirmMessage</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Rendu comme <strong>texte d'aide à côté de la valeur scannée</strong>, et non comme boîte de dialogue — voir « Message de confirmation » plus haut</td></tr><tr><td><code class="ys-code">content.validation</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Règles de validation des données scannées</td></tr><tr><td><code class="ys-code">content.validation.format</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Format des données : <code class="ys-code">"text"</code>, <code class="ys-code">"number"</code>, <code class="ys-code">"url"</code>, <code class="ys-code">"email"</code></td></tr><tr><td><code class="ys-code">content.validation.startsWith</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Préfixe requis (exempté de la validation de format)</td></tr><tr><td><code class="ys-code">content.validation.minLength</code></td><td><code class="ys-code">number</code></td><td>Non</td><td>Longueur minimale (inclut le préfixe si startsWith est défini)</td></tr><tr><td><code class="ys-code">content.validation.maxLength</code></td><td><code class="ys-code">number</code></td><td>Non</td><td>Longueur maximale (inclut le préfixe si startsWith est défini)</td></tr><tr><td><code class="ys-code">content.validation.errorMessage</code></td><td><code class="ys-code">string</code></td><td>Oui*</td><td>Message d'erreur affiché en cas d'échec de la validation (requis si validation est défini)</td></tr><tr><td><code class="ys-code">content.preview</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Configuration de l'aperçu avant la soumission</td></tr><tr><td><code class="ys-code">content.preview.enabled</code></td><td><code class="ys-code">boolean</code></td><td>Non</td><td>Affiche la valeur scannée, en lecture seule, avant la soumission (par défaut : false)</td></tr><tr><td><code class="ys-code">content.preview.label</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Libellé du champ dans l'aperçu (par défaut : "Scanned Code")</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Identifiant de processus pour les parcours multi-étapes</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Métadonnées de la vue (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<p><strong>Note :</strong> Le serveur DOIT revalider les données scannées pour des raisons de sécurité, même si une validation côté client a été effectuée. Les règles côté client relèvent du confort d'usage — elles évitent un aller-retour, elles ne garantissent rien.</p>
+
+<h2 id="methods">Méthodes</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Paramètres</th><th>Retour</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Texte d'instruction</td><td><code class="ys-code">this</code></td><td>Définit le texte d'instruction affiché à l'utilisateur</td></tr><tr><td><code class="ys-code">submitButton(text, confirmMessage?)</code></td><td><code class="ys-code">text</code> - Texte du bouton<br><code class="ys-code">confirmMessage</code> - Message optionnel affiché comme texte d'aide avec la valeur scannée</td><td><code class="ys-code">this</code></td><td>Configure le bouton de soumission (désactive autoSubmit)</td></tr><tr><td><code class="ys-code">setValidation(errorMessage, format?, minLength?, maxLength?, startsWith?)</code></td><td><code class="ys-code">errorMessage</code> - Message d'erreur<br><code class="ys-code">format</code> - Format des données ('text', 'number', 'url', 'email')<br><code class="ys-code">minLength</code> - Longueur minimale<br><code class="ys-code">maxLength</code> - Longueur maximale<br><code class="ys-code">startsWith</code> - Préfixe requis</td><td><code class="ys-code">this</code></td><td>Définit les règles de validation des données scannées</td></tr><tr><td><code class="ys-code">enablePreview(label?)</code></td><td><code class="ys-code">label</code> - Libellé du champ (par défaut : "Scanned Code")</td><td><code class="ys-code">this</code></td><td>Affiche la valeur scannée en lecture seule avant la soumission</td></tr><tr><td><code class="ys-code">disablePreview()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Désactive le mode aperçu</td></tr><tr><td><code class="ys-code">setAutoSubmit(enabled?)</code></td><td><code class="ys-code">enabled</code> - Indicateur d'activation (par défaut : true)</td><td><code class="ys-code">this</code></td><td>Active ou désactive explicitement la soumission automatique</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Sert la vue avec validation (hérité de BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Renvoie la représentation JSON (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - Clé d'état<br><code class="ys-code">value</code> - Valeur d'état</td><td><code class="ys-code">void</code></td><td>Définit l'état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - Clé d'état</td><td><code class="ys-code">unknown</code></td><td>Lit l'état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue suivante</td><td><code class="ys-code">this</code></td><td>Contrôle avant d'une séquence paginée, dessiné par le client — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue précédente</td><td><code class="ys-code">this</code></td><td>Contrôle arrière de la même séquence. Ce n'est PAS là que mène le geste de retour — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, ou un entier &lt;= 1</td><td><code class="ys-code">this</code></td><td>Comment cette vue entre dans la pile de navigation du client (défaut : <code class="ys-code">push</code>) — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - position, à partir de 1<br><code class="ys-code">total</code> - longueur de la séquence, si connue</td><td><code class="ys-code">this</code></td><td>Où cette vue se situe dans sa séquence ; le client dessine l'indicateur — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Identifiant de processus<br><code class="ys-code">context</code> - Contexte de processus</td><td><code class="ys-code">this</code></td><td>Définit le contexte de processus (hérité de BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">Exemples de code JavaScript</h2>
+
+<h3 id="simple-auto-submit-qr-scan">Scan QR simple avec soumission automatique</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const qrScan = yeriaApp
+    .createQRScanView('scan-ticket', 'Scan Your Ticket')
+    .setIntro('Point camera at the QR code on your ticket');
+// → Scans, immediately POSTs { qrData: "ABC123" } to {baseUrl}/scan-ticket
+
+const response = yeriaApp.serve(qrScan);</code></pre>
+
+<h3 id="qr-scan-with-manual-confirmation">Scan QR avec confirmation manuelle</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('verify-product', 'Verify Product')
+    .setIntro('Scan the product barcode')
+    .enablePreview('Product Code')
+    .submitButton('Verify Product');
+// → Scans, shows the code read-only, user clicks "Verify Product" to submit</code></pre>
+
+<h3 id="qr-scan-with-validation">Scan QR avec validation</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-invoice', 'Scan Invoice')
+    .setIntro('Scan the invoice QR code')
+    .setValidation(
+        'Invalid invoice format',
+        'number',      // Format: digits only
+        10,            // minLength
+        15,            // maxLength
+        'INV-'         // startsWith prefix
+    )
+    .submitButton('Process Invoice');
+// → Accepts: "INV-123456" (10-15 chars total, digits after INV-)</code></pre>
+
+<h3 id="qr-scan-with-numeric-code-validation">Scan QR avec validation de code numérique</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-code', 'Scan Code')
+    .setIntro('Scan the 6-digit code')
+    .setValidation(
+        'Code must be 6 digits',
+        'number',  // Format: digits only
+        6,         // minLength
+        6          // maxLength
+    );
+// → Accepts: "123456", "000001"</code></pre>
+
+<h3 id="qr-scan-with-email-format-validation">Scan QR avec validation de format e-mail</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-email', 'Scan Email QR')
+    .setIntro('Scan the email QR code')
+    .setValidation(
+        'Invalid email format',
+        'email'  // Simple check: has @ and .
+    )
+    .submitButton('Submit Email');
+// → Accepts: "user@example.com"</code></pre>
+
+<h3 id="qr-scan-with-url-format-validation">Scan QR avec validation de format URL</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-url', 'Scan URL')
+    .setIntro('Scan the URL QR code')
+    .setValidation(
+        'Invalid URL',
+        'url'  // Starts with http:// or https://
+    )
+    .submitButton('Open URL');
+// → Accepts: "https://example.com"</code></pre>
+
+<h3 id="qr-scan-with-prefix-validation">Scan QR avec validation de préfixe</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-ticket', 'Scan Ticket')
+    .setIntro('Scan your ticket QR code')
+    .setValidation(
+        'Must start with TICKET-',
+        undefined,      // No format restriction
+        undefined,      // No minLength
+        undefined,      // No maxLength
+        'TICKET-'       // Required prefix
+    )
+    .submitButton('Confirm Ticket');
+// → Accepts: "TICKET-ABC123", "TICKET-XYZ"</code></pre>
+
+<h3 id="qr-scan-with-length-range-validation">Scan QR avec validation de plage de longueur</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-code', 'Scan Code')
+    .setIntro('Scan the code')
+    .setValidation(
+        'Code must be 8-20 characters',
+        undefined,  // No format restriction
+        8,          // minLength
+        20          // maxLength
+    )
+    .submitButton('Submit Code');</code></pre>
+
+<h3 id="qr-scan-with-preview-and-a-confirmation-message">Scan QR avec aperçu et message de confirmation</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-confirm', 'Scan Code')
+    .setIntro('Scan the code on the parcel')
+    .enablePreview('Parcel Code')
+    .submitButton('Confirm', 'Check the code against the label before validating.');
+// → Shows the scanned code read-only, with the message rendered as help text
+//   next to it, and submits on the tap. The preview is never editable.</code></pre>
+
+<h3 id="qr-scan-disabling-auto-submit">Scan QR désactivant la soumission automatique</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-review', 'Scan Code')
+    .setIntro('Scan the code')
+    .setAutoSubmit(false)  // Explicitly disable auto-submit
+    .submitButton('Review and Submit');
+// → Requires button click to submit</code></pre>
+
+<h3 id="qr-scan-in-process-workflow">Scan QR dans un parcours multi-étapes</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrScan = yeriaApp
+    .createQRScanView('scan-step-2', 'Scan Verification Code')
+    .setProcess('verification', {
+        processName: 'Account Verification',
+        currentStep: 2,
+        totalSteps: 3,
+        stepName: 'Scan Code'
+    })
+    .setIntro('Scan the verification code sent to your email')
+    .setValidation(
+        'Invalid verification code',
+        'number',
+        6,
+        6
+    )
+    .submitButton('Verify');</code></pre>
+
+<h2 id="complete-json-example">Exemple JSON complet</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "scan-verification",
+  "type": "QRScan",
+  "content": {
+    "title": "Scan Verification Code",
+    "intro": "Scan the verification code sent to your email",
+    "autoSubmit": true,
+    "submit": {
+      "text": "Verify",
+      "method": "POST"
+    },
+    "validation": {
+      "errorMessage": "Invalid verification code",
+      "format": "number",
+      "minLength": 6,
+      "maxLength": 6
+    },
+    "preview": {
+      "enabled": true,
+      "label": "Scanned Code"
+    }
+  },
+  "process": {
+    "processId": "verification",
+    "processName": "Account Verification",
+    "currentStep": 2,
+    "totalSteps": 3,
+    "stepName": "Scan Code"
+  },
+  "metadata": {
+    "version": "2.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

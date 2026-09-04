@@ -1,0 +1,387 @@
+<p><strong>Status:</strong> Draft. Clean break from v1; no production data, no migration concerns.</p>
+
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">MapView</code> component renders geographic data on an interactive map. The wire format is structured around a stack of named <strong>layers</strong> — markers, shapes, heatmaps, custom tile sources, or raw GeoJSON — that the renderer composes into one view, with an optional UI toggle panel.</p>
+
+<h3 id="design-philosophy">Design philosophy</h3>
+
+<ul><li><strong>Backend describes data + intent.</strong> The backend specifies <em>what</em> to display (markers, shapes, layer ordering, default visibility, click actions) and <em>what camera</em> to start with. The renderer owns <em>how it looks</em> (icons, animations, gestures) and translates the spec into native widgets (<code class="ys-code">flutter_map</code> <code class="ys-code">Marker</code>/<code class="ys-code">Polyline</code>/<code class="ys-code">Polygon</code>/<code class="ys-code">CircleMarker</code> on mobile, <code class="ys-code">mapbox-gl</code> / <code class="ys-code">leaflet</code> layers on web).</li><li><strong>One coordinate convention, everywhere.</strong> All geographic points are <code class="ys-code">{ lat: number, lon: number }</code> objects. Array-form coordinates (<code class="ys-code">[lon, lat]</code> or <code class="ys-code">[lat, lon]</code>) are never accepted in any field, including inside GeoJSON layer payloads — see <a href="#coordinate-convention">Coordinate convention</a>.</li><li><strong>Layers are first-class — and the only data path on the wire.</strong> Even a single-marker map is described as <code class="ys-code">layers: [{ type: 'markers', markers: [...] }]</code>. The SDK provides convenience methods (<code class="ys-code">addMarker</code>, <code class="ys-code">addPolygon</code>, …) that compose into layers under the hood, so backend authors keep terse code.</li><li><strong>GeoJSON is an escape hatch, not the default.</strong> A backend that already produces GeoJSON (PostGIS, Overpass, etc.) can wire it in via a <code class="ys-code">geojson</code> layer type, but the typed <code class="ys-code">markers</code> / <code class="ys-code">shapes</code> layer types exist so backend authors don't need GIS expertise for the common cases.</li></ul>
+
+<h2 id="quick-start">Quick start</h2>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+// `addMarker` is a convenience method — under the hood it appends to a
+// default markers layer, creating it on first call. The wire payload that
+// reaches the renderer is always shaped as `{ layers: [...] }`.
+const map = yeriaApp.createMapView('stores-map', 'Partner Stores')
+  .setIntro('Find our partner stores')
+  .setViewport({ center: { lat: 48.8566, lon: 2.3522 }, zoom: 12 })
+  .setControls({ zoom: true, userLocation: true, layerToggle: true })
+  .addMarker({
+    id: 'paris',
+    location: { lat: 48.8566, lon: 2.3522 },
+    title: 'Paris Centre',
+    description: 'Open 9–19',
+    icon: 'store',
+    action: { method: 'GET', url: '/api/stores/paris' }
+  });
+
+return yeriaApp.serve(map);</code></pre>
+
+<h2 id="top-level-model">Top-level model</h2>
+
+<pre class="ys-codeblock" data-lang="ts"><code>interface MapView {
+  id: string;
+  type: 'Map';
+  content: MapContent;
+  metadata?: ViewMetadata;
+  process?: ProcessContext;
+}
+
+interface MapContent {
+  // Header
+  title: string;
+  intro?: string;
+
+  // Camera
+  viewport?: MapViewport;
+  basemap?: 'streets' | 'satellite' | 'terrain' | 'dark' | 'auto'; // default 'auto'
+
+  // Data — always layered
+  layers: MapLayer[];
+
+  // UI
+  controls?: MapControls;
+  emptyMessage?: string;      // shown if no layer ends up drawable
+
+  // Input mode (location picker)
+  mode?: 'view' | 'pick';     // default 'view'
+  pick?: MapPickConfig;       // required when mode === 'pick'
+}</code></pre>
+
+<p><code class="ys-code">layers[]</code> is the single data path — even a one-marker map is described as one <code class="ys-code">markers</code> layer with one entry. The SDK convenience methods (<code class="ys-code">addMarker</code>, <code class="ys-code">addPolygon</code>, …) build/append to default layers so backend code stays terse. A view that resolves to zero drawable layers in <code class="ys-code">mode: 'view'</code> requires <code class="ys-code">emptyMessage</code>; in <code class="ys-code">mode: 'pick'</code>, the user-placed marker is the data.</p>
+
+<h2 id="coordinate-convention">Coordinate convention</h2>
+
+<p>Every geographic point in this spec is:</p>
+
+<pre class="ys-codeblock" data-lang="ts"><code>interface GeoPoint {
+  lat: number;       // -90 to 90
+  lon: number;       // -180 to 180
+  altitude?: number; // meters above sea level
+  precision?: number;// horizontal accuracy in meters (sensor data)
+}</code></pre>
+
+<ul><li><strong>Always an object</strong>, never an array. <code class="ys-code">[lat, lon]</code> and <code class="ys-code">[lon, lat]</code> are both rejected by the SDK validator.</li><li>Renderer-side conversion is one line:</li><li><strong>Dart / <code class="ys-code">latlong2</code>:</strong> <code class="ys-code">LatLng(p.lat as double, p.lon as double)</code></li><li><strong>Mapbox GL / Leaflet:</strong> <code class="ys-code">[p.lon, p.lat]</code> (lon first, GeoJSON convention)</li><li><strong><code class="ys-code">flutter_map_geojson</code>:</strong> the SDK's <code class="ys-code">geojson</code> layer type emits already-converted GeoJSON, so renderers using that path consume <code class="ys-code">[lon, lat]</code> only inside GeoJSON payloads — the rest of the spec stays <code class="ys-code">{lat, lon}</code>.</li></ul>
+
+<h2 id="markers">Markers</h2>
+
+<pre class="ys-codeblock" data-lang="ts"><code>interface MapMarker {
+  id: string;
+  location: GeoPoint;
+
+  // Display
+  title?: string;
+  description?: string;
+  icon?: string;          // catalog name OR full URL OR data: URI
+  color?: string;         // hex string, e.g. '#1A73E8'; falls back to renderer default
+  size?: 'sm' | 'md' | 'lg'; // default 'md'
+  selected?: boolean;     // renderer should highlight; default false
+
+  // Interaction
+  action?: ActionRef;     // see "Actions"
+  popup?: MarkerPopup;    // overrides the default title+description popup
+
+  // Free-form
+  meta?: Record&lt;string, unknown&gt;;
+}
+
+interface MarkerPopup {
+  title?: string;         // defaults to marker.title
+  body?: string;          // markdown allowed
+  image?: string;         // URL
+  actions?: ActionRef[];  // buttons inside the popup
+}</code></pre>
+
+<p>Renderers should treat <code class="ys-code">icon</code> as: (a) a known catalog name (e.g. <code class="ys-code">'store'</code>, <code class="ys-code">'home'</code>, <code class="ys-code">'pin'</code>) if it matches their catalog; (b) a URL if it starts with <code class="ys-code">http(s)://</code> or <code class="ys-code">data:</code>; (c) fall back to the renderer's default pin and ignore unknown values.</p>
+
+<h2 id="shapes-typed-geometry">Shapes (typed geometry)</h2>
+
+<p><code class="ys-code">shapes</code> replaces v1's polygon-via-<code class="ys-code">overlays</code> path. Drawn on top of basemap, below markers (unless layer <code class="ys-code">zIndex</code> says otherwise).</p>
+
+<pre class="ys-codeblock" data-lang="ts"><code>type MapShape = PolygonShape | CircleShape | PolylineShape | RectangleShape;
+
+interface ShapeBase {
+  id: string;
+  config?: ShapeStyle;
+  action?: ActionRef;     // optional click handler
+  meta?: Record&lt;string, unknown&gt;;
+}
+
+interface PolygonShape extends ShapeBase {
+  type: 'Polygon';
+  points: GeoPoint[];     // 3+ points; the polygon auto-closes
+}
+
+interface CircleShape extends ShapeBase {
+  type: 'Circle';
+  center: GeoPoint;
+  radius: number;         // meters
+}
+
+interface PolylineShape extends ShapeBase {
+  type: 'Polyline';
+  points: GeoPoint[];     // 2+ points
+}
+
+interface RectangleShape extends ShapeBase {
+  type: 'Rectangle';
+  sw: GeoPoint;           // south-west corner
+  ne: GeoPoint;           // north-east corner
+}
+
+interface ShapeStyle {
+  fillColor?: string;
+  fillOpacity?: number;   // 0–1
+  strokeColor?: string;
+  strokeOpacity?: number; // 0–1
+  strokeWidth?: number;   // px
+  dashed?: boolean;
+}</code></pre>
+
+<h2 id="viewport">Viewport</h2>
+
+<pre class="ys-codeblock" data-lang="ts"><code>interface MapViewport {
+  // Pick ONE of (center+zoom) or (bounds) or (fitMarkers)
+  center?: GeoPoint;
+  zoom?: number;          // typical 0–22
+  bounds?: { sw: GeoPoint; ne: GeoPoint };
+  fitMarkers?: boolean;   // if true, renderer fits viewport to all visible markers + shapes; takes precedence
+
+  // Constraints
+  minZoom?: number;
+  maxZoom?: number;
+
+  // 3D — renderer may ignore if unsupported (must NOT throw)
+  bearing?: number;       // 0–360, default 0
+  pitch?: number;         // 0–60, default 0
+}</code></pre>
+
+<p>Resolution order at render time: <code class="ys-code">fitMarkers</code> → <code class="ys-code">bounds</code> → <code class="ys-code">center+zoom</code>. If none are supplied and there is at least one marker/shape, the renderer fits to the data; otherwise it shows a sensible default region (renderer choice).</p>
+
+<h2 id="controls">Controls</h2>
+
+<pre class="ys-codeblock" data-lang="ts"><code>interface MapControls {
+  zoom?: boolean;            // zoom +/- buttons; default true
+  compass?: boolean;         // shown when bearing != 0; default true
+  userLocation?: boolean;    // "locate me" button; default false
+  layerToggle?: boolean;     // legend / show-hide panel; default true if any layer is `toggleable`
+  scale?: boolean;           // distance scale; default false
+  fullscreen?: boolean;      // default false
+  attribution?: string;      // override; renderer must always show some attribution
+}</code></pre>
+
+<h2 id="layers-multi-layer-composition">Layers (multi-layer composition)</h2>
+
+<p>When more than one logical dataset shares a map (e.g. <em>Stores</em>, <em>Coverage zones</em>, <em>Traffic</em>), use <code class="ys-code">layers[]</code>:</p>
+
+<pre class="ys-codeblock" data-lang="ts"><code>type MapLayer =
+  | MarkersLayer
+  | ShapesLayer
+  | HeatmapLayer
+  | TilesLayer
+  | GeoJsonLayer;
+
+interface LayerBase {
+  id: string;                // stable id; clients persist toggle state by id
+  name?: string;             // shown in legend / toggle UI
+  legendIcon?: string;       // icon shown next to `name`
+  visible?: boolean;         // default true
+  toggleable?: boolean;      // user can show/hide; default true
+  zIndex?: number;           // higher = on top; default by insertion order
+  minZoom?: number;          // hide below this zoom
+  maxZoom?: number;          // hide above this zoom
+}
+
+interface MarkersLayer extends LayerBase {
+  type: 'markers';
+  markers: MapMarker[];
+  cluster?: boolean;         // default true when markers.length &gt; 50
+  clusterRadius?: number;    // px; default 50
+}
+
+interface ShapesLayer extends LayerBase {
+  type: 'shapes';
+  shapes: MapShape[];
+}
+
+interface HeatmapLayer extends LayerBase {
+  type: 'heatmap';
+  points: Array&lt;{ lat: number; lon: number; intensity?: number }&gt;;
+  radius?: number;           // px; default 25
+  intensityMax?: number;     // default 1
+  colorRamp?: string[];      // hex stops, low-to-high; renderer default if omitted
+}
+
+interface TilesLayer extends LayerBase {
+  type: 'tiles';
+  url: string;               // {z}/{x}/{y} template
+  attribution: string;       // required by most providers
+  maxNativeZoom?: number;
+  opacity?: number;          // 0–1
+}
+
+interface GeoJsonLayer extends LayerBase {
+  type: 'geojson';
+  data: object;              // RFC 7946 FeatureCollection | Feature | Geometry
+  // Defaults applied to features that lack `properties.style`:
+  defaultMarkerIcon?: string;
+  defaultShapeStyle?: ShapeStyle;
+}</code></pre>
+
+<h3 id="where-do-addmarker-addshape-friends-append-to">Where do <code class="ys-code">addMarker</code> / <code class="ys-code">addShape</code> / friends append to?</h3>
+
+<p>The convenience methods all take an <strong>optional final <code class="ys-code">layerId</code> argument</strong> that selects the target layer:</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Call</th><th>Target</th></tr></thead><tbody><tr><td><code class="ys-code">addMarker(m)</code> <em>(no layerId)</em></td><td>Default markers layer <code class="ys-code">_default_markers</code>. Auto-created on first call with <code class="ys-code">name: undefined</code>, <code class="ys-code">toggleable: false</code>.</td></tr><tr><td><code class="ys-code">addMarker(m, 'stores')</code></td><td>Layer with <code class="ys-code">id: 'stores'</code>. <strong>Must already exist</strong> (created via <code class="ys-code">addLayer({...})</code>). Throws <code class="ys-code">LayerNotFoundError</code> otherwise.</td></tr><tr><td><code class="ys-code">addPolygon(id, points, config?)</code> <em>(no layerId)</em></td><td>Default shapes layer <code class="ys-code">_default_shapes</code>.</td></tr><tr><td><code class="ys-code">addPolygon(id, points, config?, 'zones')</code></td><td>Named layer <code class="ys-code">'zones'</code>. Same pre-existence rule.</td></tr><tr><td>Same pattern for <code class="ys-code">addMarkers</code>, <code class="ys-code">addCircle</code>, <code class="ys-code">addPolyline</code>, <code class="ys-code">addRectangle</code>, <code class="ys-code">addShape</code>.</td><td></td></tr></tbody></table></div>
+
+<p>Type mismatches throw <code class="ys-code">LayerTypeMismatchError</code> at the moment of the call (e.g. trying to append a marker to a <code class="ys-code">shapes</code>-type layer). Errors fire on the SDK builder, not at <code class="ys-code">serve()</code>, so backend authors get immediate feedback in dev.</p>
+
+<p>There is no hidden "current layer" cursor — every call either uses the default layer or names a target explicitly.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>// Simple case — no layer ceremony
+map.addMarker({ id: 'home', location: { lat: 6.13, lon: 1.22 } });
+//  → goes into _default_markers (auto-created)
+
+// Multi-layer case — declare, then target
+map
+  .addLayer({ id: 'stores', type: 'markers', name: 'Boutiques', cluster: true })
+  .addLayer({ id: 'events', type: 'markers', name: 'Événements' });
+
+map.addMarker({ id: 'paris', location: { lat: 48.85, lon: 2.35 } }, 'stores');
+map.addMarker({ id: 'fest',  location: { lat: 43.60, lon: 1.44 } }, 'events');</code></pre>
+
+<h2 id="picker-mode-location-input">Picker mode (location input)</h2>
+
+<p>For workflows that need a user-chosen location:</p>
+
+<pre class="ys-codeblock" data-lang="ts"><code>interface MapPickConfig {
+  prompt?: string;                 // helper text above the map; e.g. "Tap to choose your delivery point"
+  initialLocation?: GeoPoint;
+  submitUrl: string;               // URL the picked location is POSTed to
+  submitMethod?: 'POST' | 'PUT';   // default POST
+  submitLabel?: string;            // confirm button label; default "Confirm"
+  payloadKey?: string;             // key under which the location is sent; default 'location'
+  bounds?: { sw: GeoPoint; ne: GeoPoint }; // restrict pickable area
+  snapToMarkers?: boolean;         // default false; if true, picking snaps to the nearest existing marker
+}</code></pre>
+
+<p>When <code class="ys-code">mode === 'pick'</code>, the renderer:</p>
+
+<ol><li>Shows the map with the existing markers/shapes as context.</li><li>Lets the user place/move a single picker marker (initialized at <code class="ys-code">pick.initialLocation</code> or the user's current location if <code class="ys-code">controls.userLocation</code> is on).</li><li>On confirm, sends <code class="ys-code">POST pick.submitUrl</code> with body <code class="ys-code">{ [pick.payloadKey]: { lat, lon }, processContext? }</code>.</li></ol>
+
+<p>The mobile picker primitive already exists in <a href="/docs/yeriaapp/lib/presentation/shared/widgets/map_picker/gps_map_picker_widget.dart">yeria-app/lib/presentation/shared/widgets/map_picker/gps_map_picker_widget.dart</a> — the spec just gives it a wire format.</p>
+
+<h2 id="actions">Actions</h2>
+
+<p><code class="ys-code">ActionRef</code> is the same shape every other Yeria view uses, so the JsonRenderer's action dispatcher routes map clicks through one path:</p>
+
+<pre class="ys-codeblock" data-lang="ts"><code>interface ActionRef {
+  url: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'; // default GET
+  body?: Record&lt;string, unknown&gt;;
+  confirm?: { title: string; message: string; submitLabel?: string };
+}</code></pre>
+
+<p>Marker <code class="ys-code">action</code> and shape <code class="ys-code">action</code> are both supported. If absent, tapping the marker shows the popup (or does nothing for a shape).</p>
+
+<h2 id="sdk-methods-javascript">SDK methods (JavaScript)</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Description</th></tr></thead><tbody><tr><td><strong>View setup</strong></td><td></td></tr><tr><td><code class="ys-code">setIntro(text)</code></td><td>Intro paragraph above the map.</td></tr><tr><td><code class="ys-code">setViewport(viewport)</code></td><td><code class="ys-code">viewport</code> is a <code class="ys-code">MapViewport</code>; pass <code class="ys-code">{ center, zoom }</code> for the simple case.</td></tr><tr><td><code class="ys-code">setBasemap(name)</code></td><td><code class="ys-code">'streets' | 'satellite' | 'terrain' | 'dark' | 'auto'</code>.</td></tr><tr><td><code class="ys-code">setControls(controls)</code></td><td><code class="ys-code">MapControls</code> partial; merged with defaults.</td></tr><tr><td><code class="ys-code">setEmptyMessage(text)</code></td><td>Shown when no layer ends up drawable.</td></tr><tr><td><strong>Convenience — default layer or named target via optional <code class="ys-code">layerId</code></strong></td><td></td></tr><tr><td><code class="ys-code">addMarker(marker, layerId?)</code> / <code class="ys-code">addMarkers(markers, layerId?)</code></td><td>Append into <code class="ys-code">layerId</code> (must exist) or <code class="ys-code">_default_markers</code> (auto-created on first call).</td></tr><tr><td><code class="ys-code">clearMarkers(layerId?)</code></td><td>Empty the targeted markers layer (default if omitted).</td></tr><tr><td><code class="ys-code">addPolygon(id, points, config?, layerId?)</code></td><td>Append a <code class="ys-code">Polygon</code> into <code class="ys-code">layerId</code> or <code class="ys-code">_default_shapes</code>.</td></tr><tr><td><code class="ys-code">addCircle(id, center, radius, config?, layerId?)</code></td><td>Append a <code class="ys-code">Circle</code>.</td></tr><tr><td><code class="ys-code">addPolyline(id, points, config?, layerId?)</code></td><td>Append a <code class="ys-code">Polyline</code>.</td></tr><tr><td><code class="ys-code">addRectangle(id, sw, ne, config?, layerId?)</code></td><td>Append a <code class="ys-code">Rectangle</code>.</td></tr><tr><td><code class="ys-code">addShape(shape, layerId?)</code></td><td>Append a typed shape.</td></tr><tr><td><code class="ys-code">clearShapes(layerId?)</code></td><td>Empty the targeted shapes layer.</td></tr><tr><td><strong>Layers — explicit composition</strong></td><td></td></tr><tr><td><code class="ys-code">addLayer(layer)</code></td><td>Push a typed layer onto the stack.</td></tr><tr><td><code class="ys-code">setLayers(layers)</code></td><td>Replace the layer stack.</td></tr><tr><td><code class="ys-code">clearLayers()</code></td><td>Empty the layer stack (also drops the implicit defaults).</td></tr><tr><td><code class="ys-code">getLayer(id)</code></td><td>Returns the layer with that id, or <code class="ys-code">undefined</code>.</td></tr><tr><td><strong>Picker</strong></td><td></td></tr><tr><td><code class="ys-code">setPickMode(config)</code></td><td>Sets <code class="ys-code">mode='pick'</code> and <code class="ys-code">pick=config</code>.</td></tr><tr><td><strong>Inherited</strong></td><td></td></tr><tr><td><code class="ys-code">getContent()</code> / <code class="ys-code">serve()</code> / <code class="ys-code">toJSON()</code> / <code class="ys-code">setProcess(...)</code> etc.</td><td>From <code class="ys-code">BaseView</code>.</td></tr></tbody></table></div>
+
+<h2 id="renderer-compliance-matrix">Renderer compliance matrix</h2>
+
+<p>Renderers SHOULD report their compliance level against this matrix in their docs. A renderer is <strong>conformant</strong> if it implements every MUST, fails gracefully on every MAY (unknown values are no-ops, never crashes), and documents every SHOULD it skips.</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Feature</th><th>Level</th></tr></thead><tbody><tr><td><code class="ys-code">title</code>, <code class="ys-code">intro</code></td><td>MUST</td></tr><tr><td><code class="ys-code">markers</code> shorthand</td><td>MUST</td></tr><tr><td><code class="ys-code">shapes</code> shorthand (Polygon, Circle, Polyline)</td><td>MUST</td></tr><tr><td><code class="ys-code">viewport.{center, zoom}</code></td><td>MUST</td></tr><tr><td><code class="ys-code">viewport.fitMarkers</code></td><td>MUST</td></tr><tr><td><code class="ys-code">viewport.bounds</code></td><td>SHOULD</td></tr><tr><td><code class="ys-code">viewport.{minZoom, maxZoom}</code></td><td>SHOULD</td></tr><tr><td><code class="ys-code">viewport.{bearing, pitch}</code></td><td>MAY</td></tr><tr><td><code class="ys-code">basemap</code></td><td>SHOULD (must accept the value, may render best-effort)</td></tr><tr><td><code class="ys-code">controls.zoom</code></td><td>MUST</td></tr><tr><td><code class="ys-code">controls.userLocation</code></td><td>SHOULD</td></tr><tr><td><code class="ys-code">controls.compass</code></td><td>SHOULD</td></tr><tr><td><code class="ys-code">controls.layerToggle</code></td><td>SHOULD</td></tr><tr><td><code class="ys-code">controls.{scale, fullscreen, attribution}</code></td><td>MAY</td></tr><tr><td><code class="ys-code">marker.{icon, color, size, selected}</code></td><td>SHOULD (icon catalog), MUST not crash on unknown values</td></tr><tr><td><code class="ys-code">marker.action</code></td><td>MUST</td></tr><tr><td><code class="ys-code">marker.popup</code></td><td>SHOULD</td></tr><tr><td><code class="ys-code">shape.action</code></td><td>SHOULD</td></tr><tr><td><code class="ys-code">Rectangle</code> shape</td><td>SHOULD</td></tr><tr><td><code class="ys-code">layers[]</code> (markers, shapes)</td><td>MUST</td></tr><tr><td><code class="ys-code">layers[]</code> heatmap</td><td>SHOULD</td></tr><tr><td><code class="ys-code">layers[]</code> tiles</td><td>SHOULD</td></tr><tr><td><code class="ys-code">layers[]</code> geojson</td><td>SHOULD</td></tr><tr><td><code class="ys-code">layer.{visible, toggleable, zIndex, minZoom, maxZoom}</code></td><td>MUST for the layer types it supports</td></tr><tr><td><code class="ys-code">layer.cluster</code> (markers)</td><td>SHOULD</td></tr><tr><td><code class="ys-code">mode: 'pick'</code></td><td>SHOULD</td></tr><tr><td><code class="ys-code">emptyMessage</code></td><td>MUST</td></tr></tbody></table></div>
+
+<h2 id="validation-rules-sdk-side">Validation rules (SDK side)</h2>
+
+<ul><li><code class="ys-code">lat ∈ [-90, 90]</code>, <code class="ys-code">lon ∈ [-180, 180]</code>. Reject otherwise.</li><li>A <code class="ys-code">Polygon</code> requires <code class="ys-code">points.length ≥ 3</code>. A <code class="ys-code">Polyline</code> requires <code class="ys-code">points.length ≥ 2</code>.</li><li><code class="ys-code">Circle.radius &gt; 0</code>.</li><li><code class="ys-code">Rectangle.sw.lat ≤ ne.lat</code>, <code class="ys-code">sw.lon ≤ ne.lon</code>.</li><li><code class="ys-code">viewport.zoom ∈ [0, 22]</code>. <code class="ys-code">bearing ∈ [0, 360)</code>. <code class="ys-code">pitch ∈ [0, 60]</code>.</li><li>A <code class="ys-code">MarkersLayer</code> requires <code class="ys-code">markers.length ≥ 1</code>; a <code class="ys-code">ShapesLayer</code> requires <code class="ys-code">shapes.length ≥ 1</code>; a <code class="ys-code">HeatmapLayer</code> requires <code class="ys-code">points.length ≥ 1</code>.</li><li>Layer <code class="ys-code">id</code> values must be unique within <code class="ys-code">layers[]</code>.</li><li><code class="ys-code">mode === 'pick'</code> requires <code class="ys-code">pick.submitUrl</code>.</li><li>A <code class="ys-code">mode: 'view'</code> view whose <code class="ys-code">layers[]</code> is empty (or contains only zero-drawable layers) requires <code class="ys-code">emptyMessage</code>. In <code class="ys-code">mode: 'pick'</code> mode, layers are optional context; the user-placed marker is the data.</li></ul>
+
+<h2 id="complete-example">Complete example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "logistics",
+  "type": "Map",
+  "content": {
+    "title": "Logistique – Région du Centre",
+    "intro": "Aperçu en temps réel des points de livraison et zones de couverture.",
+    "basemap": "auto",
+    "viewport": { "fitMarkers": true, "minZoom": 6, "maxZoom": 18 },
+    "controls": {
+      "zoom": true, "compass": true, "userLocation": true,
+      "layerToggle": true, "scale": true
+    },
+    "layers": [
+      {
+        "id": "stores",
+        "type": "markers",
+        "name": "Boutiques",
+        "legendIcon": "store",
+        "cluster": true,
+        "markers": [
+          {
+            "id": "store-lome",
+            "location": { "lat": 6.1319, "lon": 1.2228 },
+            "title": "Boutique Lomé Centre",
+            "description": "Ouvert 8h–20h",
+            "icon": "store",
+            "color": "#1A73E8",
+            "action": { "method": "GET", "url": "/api/stores/lome" }
+          }
+        ]
+      },
+      {
+        "id": "coverage",
+        "type": "shapes",
+        "name": "Zone de livraison",
+        "visible": true,
+        "toggleable": true,
+        "zIndex": -1,
+        "shapes": [
+          {
+            "id": "delivery-zone",
+            "type": "Polygon",
+            "points": [
+              { "lat": 6.20, "lon": 1.18 },
+              { "lat": 6.20, "lon": 1.30 },
+              { "lat": 6.05, "lon": 1.30 },
+              { "lat": 6.05, "lon": 1.18 }
+            ],
+            "config": { "fillColor": "#34A853", "fillOpacity": 0.15, "strokeColor": "#34A853", "strokeWidth": 2 }
+          }
+        ]
+      },
+      {
+        "id": "traffic",
+        "type": "heatmap",
+        "name": "Trafic",
+        "visible": false,
+        "points": [
+          { "lat": 6.13, "lon": 1.22, "intensity": 0.9 },
+          { "lat": 6.14, "lon": 1.23, "intensity": 0.6 }
+        ]
+      }
+    ]
+  },
+  "metadata": { "version": "2.0.0", "createdAt": "2026-04-26T08:00:00.000Z" }
+}</code></pre>
+
+<h2 id="changelog">Changelog</h2>
+
+<p>See map-view-changelog.md — high-level diff against v1 and the rationale for each change.</p>

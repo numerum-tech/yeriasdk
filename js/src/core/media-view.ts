@@ -31,7 +31,6 @@ export class MediaView extends BaseView {
 
         this.content = {
             title,
-            intro: '',
             items: []
         } as MediaContent;
     }
@@ -48,14 +47,26 @@ export class MediaView extends BaseView {
             throw new Error('Media item requires an id, type, and at least one source');
         }
 
-        const { selected: _ignored, ...rest } = item;
-        (this.content as MediaContent).items.push({
-            ...rest,
+        // Spelt out rather than spread: `...rest` carried the CALLER's key
+        // order into the payload, so the same entry signed differently
+        // depending on how it was written, and neither order matched Python's.
+        // `selected` is left out on purpose — use setSelectedItem(id).
+        const entry: Record<string, unknown> = {
             id: item.id.trim(),
+            kind: item.kind,
             title: item.title?.trim(),
             description: item.description?.trim(),
-            sources: item.sources.map(source => this.normalizeSource(source))
-        });
+            poster: item.poster,
+            autoplay: item.autoplay,
+            loop: item.loop,
+            controls: item.controls,
+            sources: item.sources.map(source => this.normalizeSource(source)),
+            meta: item.meta
+        };
+        for (const key of Object.keys(entry)) {
+            if (entry[key] === undefined) delete entry[key];
+        }
+        (this.content as MediaContent).items.push(entry as unknown as MediaItem);
 
         return this;
     }
@@ -93,7 +104,10 @@ export class MediaView extends BaseView {
             poster: options.poster?.trim(),
             autoplay: options.autoplay,
             loop: options.loop,
-            controls: options.controls ?? true,
+            // Same rule as addMediaItem: the default belongs to the client.
+            // Filling it in here made an item built through this helper sign
+            // differently from the same item written as a literal.
+            controls: options.controls,
             sources: [primarySource]
         };
     }

@@ -15,6 +15,18 @@ import { MissingRequiredParameterError } from '../errors';
  * populated with these builders, then serialized to a JSON view description and
  * signed into a v3 envelope by `serve()`.
  */
+/**
+ * Drops the keys left `undefined`, so an unset field is absent rather than
+ * present-and-undefined. `JSON.stringify` would drop it anyway; this keeps the
+ * in-memory object honest too, and matches what Python emits.
+ */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+    for (const key of Object.keys(obj)) {
+        if (obj[key] === undefined) delete obj[key];
+    }
+    return obj;
+}
+
 export class TimelineView extends BaseView {
 
     static fromJson(json: Record<string, unknown>): TimelineView {
@@ -33,7 +45,6 @@ export class TimelineView extends BaseView {
 
         this.content = {
             title,
-            intro: '',
             items: []
         } as TimelineContent;
     }
@@ -49,13 +60,20 @@ export class TimelineView extends BaseView {
             throw new MissingRequiredParameterError('timeline item id, title, and timestamp');
         }
 
-        (this.content as TimelineContent).items.push({
-            ...item,
+        // Spelt out rather than spread. `...item` carried the CALLER's key
+        // order into the payload — an entry written `{status, id, title}`
+        // signed differently from `{id, title, status}` — and neither matched
+        // the fixed order Python emits. The signature is over the compact
+        // JSON, so the order is contract.
+        (this.content as TimelineContent).items.push(stripUndefined({
             id: item.id.trim(),
             title: item.title.trim(),
             timestamp: item.timestamp.trim(),
-            description: item.description?.trim()
-        });
+            description: item.description?.trim(),
+            status: item.status,
+            icon: item.icon,
+            meta: item.meta
+        }));
 
         return this;
     }

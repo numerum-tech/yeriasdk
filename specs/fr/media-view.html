@@ -1,0 +1,252 @@
+<h2 id="description">Description</h2>
+
+<p>Le composant <code class="ys-code">MediaView</code> regroupe des ressources audio et vidéo dans une liste de lecture homogène, destinée à la lecture sur mobile. Il prend en charge plusieurs éléments média, avec leurs sources, leurs affiches et leurs contrôles de lecture.</p>
+
+<h2 id="rendering-notes">Notes de rendu</h2>
+
+<p>Une MediaView est un <strong>lecteur assorti d’une liste de lecture facultative</strong> — et NON un carrousel ou un pager. Les moteurs de rendu doivent :</p>
+
+<ul><li>Afficher <strong>un seul lecteur</strong> pour l’élément sélectionné (affiche + contrôles de lecture natifs ; plein écran pour la vidéo, lecture intégrée avec contrôles pour l’audio).</li><li>Lorsque <code class="ys-code">content.items</code> comporte <strong>plus d’un</strong> élément, afficher une <strong>liste de lecture</strong> (une liste sélectionnable des éléments) afin que l’utilisateur puisse charger n’importe quel élément dans le lecteur. Avec un élément unique, n’afficher que le lecteur.</li><li>Ne <strong>pas</strong> présenter les éléments comme des pages plein écran défilantes (c’est le rôle de <code class="ys-code">CarouselView</code>).</li></ul>
+
+<p><code class="ys-code">content.title</code> désigne le titre de la liste de lecture ; chaque entrée de <code class="ys-code">items[]</code> constitue une ressource lisible indépendamment, décrite par ses <code class="ys-code">sources</code>, son <code class="ys-code">poster</code> et ses indicateurs de lecture.</p>
+
+<h2 id="fields-description">Description des champs</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Identifiant unique de la vue média</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Toujours <code class="ys-code">"Media"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">MediaContent</code></td><td>Oui</td><td>Objet de contenu média</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Titre de la liste de lecture</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Texte d’introduction affiché avant les éléments média</td></tr><tr><td><code class="ys-code">content.items</code></td><td><code class="ys-code">MediaItem[]</code></td><td>Oui</td><td>Tableau d’éléments média (au moins un requis)</td></tr><tr><td><code class="ys-code">content.items[].id</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Identifiant unique de l’élément média</td></tr><tr><td><code class="ys-code">content.items[].kind</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Nature du média : <code class="ys-code">"audio"</code> ou <code class="ys-code">"video"</code></td></tr><tr><td><code class="ys-code">content.items[].title</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Titre du média</td></tr><tr><td><code class="ys-code">content.items[].description</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Descriptif du média</td></tr><tr><td><code class="ys-code">content.items[].poster</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>URL de l’image d’affiche (pour la vidéo)</td></tr><tr><td><code class="ys-code">content.items[].autoplay</code></td><td><code class="ys-code">boolean</code></td><td>Non</td><td>Lecture automatique du média (défaut : false)</td></tr><tr><td><code class="ys-code">content.items[].loop</code></td><td><code class="ys-code">boolean</code></td><td>Non</td><td>Lecture en boucle du média (défaut : false)</td></tr><tr><td><code class="ys-code">content.items[].controls</code></td><td><code class="ys-code">boolean</code></td><td>Non</td><td>Afficher les contrôles de lecture (défaut : true)</td></tr><tr><td><code class="ys-code">content.items[].selected</code></td><td><code class="ys-code">boolean</code></td><td>Non</td><td>Marque l’entrée présentée en premier dans le lecteur. À positionner via <code class="ys-code">setSelectedItem(id)</code> (qui désélectionne toutes les autres) — ne jamais le renseigner manuellement sur plusieurs éléments. Par défaut, il s’agit du premier élément. À combiner avec <code class="ys-code">autoplay</code> pour démarrer la lecture dès l’ouverture.</td></tr><tr><td><code class="ys-code">content.items[].sources</code></td><td><code class="ys-code">MediaSource[]</code></td><td>Oui</td><td>Tableau de sources média (au moins une requise)</td></tr><tr><td><code class="ys-code">content.items[].sources[].src</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>URL de la source média</td></tr><tr><td><code class="ys-code">content.items[].sources[].type</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Type MIME (par ex. "video/mp4", "audio/mpeg")</td></tr><tr><td><code class="ys-code">content.items[].meta</code></td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Non</td><td>Métadonnées facultatives</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Identifiant de processus pour les parcours en plusieurs étapes</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Métadonnées de la vue (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Méthodes</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Paramètres</th><th>Retour</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Texte d’introduction</td><td><code class="ys-code">this</code></td><td>Définit le texte d’introduction affiché avant les éléments média</td></tr><tr><td><code class="ys-code">addMediaItem(item)</code></td><td><code class="ys-code">item</code> - Objet MediaItem</td><td><code class="ys-code">this</code></td><td>Ajoute une entrée média prête à être lue (<code class="ys-code">selected</code> est ignoré ici — utilisez <code class="ys-code">setSelectedItem</code>)</td></tr><tr><td><code class="ys-code">setSelectedItem(id)</code> (py: <code class="ys-code">set_selected_item</code>)</td><td><code class="ys-code">id</code> - identifiant de l’élément média</td><td><code class="ys-code">this</code></td><td>Marque cette entrée comme celle présentée en premier ; efface <code class="ys-code">selected</code> sur toutes les autres, afin qu’une seule reste sélectionnée</td></tr><tr><td><code class="ys-code">createMedia(id, kind, src, options?)</code></td><td><code class="ys-code">id</code> - Identifiant du média<br><code class="ys-code">kind</code> - Nature du média ('audio' ou 'video')<br><code class="ys-code">src</code> - URL de la source média<br><code class="ys-code">options</code> - Options du média (type, title, description, poster, autoplay, loop, controls)</td><td><code class="ys-code">MediaItem</code></td><td>Crée un objet élément média (sans l’ajouter)</td></tr><tr><td><code class="ys-code">clearItems()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Supprime tous les éléments média</td></tr><tr><td><code class="ys-code">getContent()</code></td><td>-</td><td><code class="ys-code">MediaContent</code></td><td>Renvoie l’objet de contenu média complet</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Diffuse la vue après validation (hérité de BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Renvoie la représentation JSON (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - Clé d’état<br><code class="ys-code">value</code> - Valeur d’état</td><td><code class="ys-code">void</code></td><td>Définit l’état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - Clé d’état</td><td><code class="ys-code">unknown</code></td><td>Lit l’état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue suivante</td><td><code class="ys-code">this</code></td><td>Contrôle avant d'une séquence paginée, dessiné par le client — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue précédente</td><td><code class="ys-code">this</code></td><td>Contrôle arrière de la même séquence. Ce n'est PAS là que mène le geste de retour — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, ou un entier &lt;= 1</td><td><code class="ys-code">this</code></td><td>Comment cette vue entre dans la pile de navigation du client (défaut : <code class="ys-code">push</code>) — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - position, à partir de 1<br><code class="ys-code">total</code> - longueur de la séquence, si connue</td><td><code class="ys-code">this</code></td><td>Où cette vue se situe dans sa séquence ; le client dessine l'indicateur — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Identifiant de processus<br><code class="ys-code">context</code> - Contexte du processus</td><td><code class="ys-code">this</code></td><td>Définit le contexte de processus (hérité de BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">Exemples de code JavaScript</h2>
+
+<h3 id="basic-media-view">Vue média simple</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const mediaView = yeriaApp
+    .createMediaView('media-library', 'Tutorials')
+    .setIntro('Learn in a few minutes')
+    .addMediaItem(
+        mediaView.createMedia('video-intro', 'video', 'https://example.com/videos/intro.mp4', {
+            type: 'video/mp4',
+            title: 'Introduction Video',
+            poster: 'https://example.com/posters/intro.jpg'
+        })
+    );
+
+const response = yeriaApp.serve(mediaView);</code></pre>
+
+<h3 id="media-view-with-audio">Vue média avec de l’audio</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const mediaView = yeriaApp
+    .createMediaView('audio-library', 'Audio Guides')
+    .setIntro('Listen to our audio guides')
+    .addMediaItem({
+        id: 'audio-guide',
+        kind: 'audio',
+        title: 'Getting Started Guide',
+        description: 'Learn the basics in 5 minutes',
+        sources: [
+            { src: 'https://example.com/audio/guide.mp3', type: 'audio/mpeg' }
+        ],
+        controls: true
+    });</code></pre>
+
+<h3 id="media-view-with-multiple-sources">Vue média à plusieurs sources</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const mediaView = yeriaApp
+    .createMediaView('video-library', 'Video Tutorials')
+    .setIntro('Watch our video tutorials')
+    .addMediaItem({
+        id: 'tutorial-1',
+        kind: 'video',
+        title: 'Tutorial 1',
+        description: 'First tutorial video',
+        poster: 'https://example.com/posters/tutorial1.jpg',
+        sources: [
+            { src: 'https://example.com/videos/tutorial1.mp4', type: 'video/mp4' },
+            { src: 'https://example.com/videos/tutorial1.webm', type: 'video/webm' }
+        ],
+        controls: true,
+        autoplay: false,
+        loop: false
+    });</code></pre>
+
+<h3 id="media-view-with-autoplay">Vue média en lecture automatique</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const mediaView = yeriaApp
+    .createMediaView('promo-videos', 'Promotional Videos')
+    .setIntro('Watch our promotional content')
+    .addMediaItem(
+        mediaView.createMedia('promo-1', 'video', 'https://example.com/videos/promo.mp4', {
+            type: 'video/mp4',
+            title: 'Promotional Video',
+            poster: 'https://example.com/posters/promo.jpg',
+            autoplay: true,
+            loop: true,
+            controls: true
+        })
+    );</code></pre>
+
+<h3 id="media-view-with-multiple-items">Vue média à plusieurs éléments</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const mediaView = yeriaApp
+    .createMediaView('playlist', 'Media Playlist')
+    .setIntro('Browse our media collection')
+    .addMediaItem(
+        mediaView.createMedia('video-1', 'video', 'https://example.com/videos/video1.mp4', {
+            type: 'video/mp4',
+            title: 'Video 1',
+            poster: 'https://example.com/posters/video1.jpg'
+        })
+    )
+    .addMediaItem(
+        mediaView.createMedia('audio-1', 'audio', 'https://example.com/audio/audio1.mp3', {
+            type: 'audio/mpeg',
+            title: 'Audio 1'
+        })
+    )
+    .addMediaItem({
+        id: 'video-2',
+        kind: 'video',
+        title: 'Video 2',
+        description: 'Second video',
+        poster: 'https://example.com/posters/video2.jpg',
+        sources: [
+            { src: 'https://example.com/videos/video2.mp4', type: 'video/mp4' }
+        ]
+    });</code></pre>
+
+<h3 id="media-view-clearing-items">Vue média — vidage des éléments</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const mediaView = yeriaApp
+    .createMediaView('dynamic-media', 'Dynamic Media')
+    .setIntro('Dynamic media playlist')
+    .addMediaItem(
+        mediaView.createMedia('item-1', 'video', 'https://example.com/video1.mp4', {
+            type: 'video/mp4'
+        })
+    );
+
+// Clear all items
+mediaView.clearItems();
+
+// Add new items
+mediaView.addMediaItem(
+    mediaView.createMedia('new-item-1', 'video', 'https://example.com/new-video.mp4', {
+        type: 'video/mp4',
+        title: 'New Video'
+    })
+);</code></pre>
+
+<h3 id="media-view-in-process-workflow">Vue média dans un parcours à étapes</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const mediaView = yeriaApp
+    .createMediaView('onboarding-media', 'Onboarding Tutorials')
+    .setProcess('onboarding', {
+        processName: 'User Onboarding',
+        currentStep: 2,
+        totalSteps: 3
+    })
+    .setIntro('Watch these tutorials to get started')
+    .addMediaItem(
+        mediaView.createMedia('intro-video', 'video', 'https://example.com/intro.mp4', {
+            type: 'video/mp4',
+            title: 'Introduction',
+            poster: 'https://example.com/intro-poster.jpg',
+            controls: true
+        })
+    )
+    .addMediaItem({
+        id: 'guide-audio',
+        kind: 'audio',
+        title: 'Quick Guide',
+        description: '5-minute audio guide',
+        sources: [
+            { src: 'https://example.com/guide.mp3', type: 'audio/mpeg' }
+        ]
+    });</code></pre>
+
+<h2 id="complete-json-example">Exemple JSON complet</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "tutorial-playlist",
+  "type": "Media",
+  "content": {
+    "title": "Tutorials",
+    "intro": "Learn in a few minutes",
+    "items": [
+      {
+        "id": "intro-video",
+        "kind": "video",
+        "title": "Introduction Video",
+        "description": "Get started with our platform",
+        "poster": "https://example.com/posters/intro.jpg",
+        "autoplay": false,
+        "loop": false,
+        "controls": true,
+        "sources": [
+          {
+            "src": "https://example.com/videos/intro.mp4",
+            "type": "video/mp4"
+          },
+          {
+            "src": "https://example.com/videos/intro.webm",
+            "type": "video/webm"
+          }
+        ],
+        "meta": {
+          "duration": 300,
+          "views": 1250
+        }
+      },
+      {
+        "id": "guide-audio",
+        "kind": "audio",
+        "title": "Quick Guide",
+        "description": "5-minute audio guide",
+        "autoplay": false,
+        "loop": false,
+        "controls": true,
+        "sources": [
+          {
+            "src": "https://example.com/audio/guide.mp3",
+            "type": "audio/mpeg"
+          }
+        ],
+        "meta": {
+          "duration": 300
+        }
+      },
+      {
+        "id": "advanced-tutorial",
+        "kind": "video",
+        "title": "Advanced Tutorial",
+        "description": "Learn advanced features",
+        "poster": "https://example.com/posters/advanced.jpg",
+        "autoplay": false,
+        "loop": false,
+        "controls": true,
+        "sources": [
+          {
+            "src": "https://example.com/videos/advanced.mp4",
+            "type": "video/mp4"
+          }
+        ]
+      }
+    ]
+  },
+  "process": {
+    "processId": "onboarding",
+    "processName": "User Onboarding",
+    "currentStep": 2,
+    "totalSteps": 3
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

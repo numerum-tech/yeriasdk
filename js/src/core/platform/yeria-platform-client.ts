@@ -6,6 +6,20 @@ import { UserDetails, YeriaTokenClaims, YeriaPublicKey } from '../yeria-protocol
 import { YeriaKeyPair, YeriaSigner } from '../security/yeria-signer';
 import { YeriaUserTokenVerifier } from '../security/yeria-user-token-verifier';
 import { YeriaPublicKeys } from '../key-store';
+import { stringifyForSigning } from '../../utils/signing-json';
+import { timeoutSignal } from '../../utils/timeout-signal';
+
+/**
+ * How long a platform call waits before giving up, in milliseconds.
+ *
+ * `sendNotification` already bounded itself; `getYeriaPublicKey` and
+ * `fetchUserDetails` did not, so a platform that accepted the connection and
+ * then went quiet held a provider's request handler open indefinitely. Five
+ * seconds is what the Python SDK has always used (`timeout=5`), so the two
+ * give up at the same point. A configured `notificationTimeout` comes first,
+ * as it does for `sendNotification`; a per-call `timeoutMs` wins over both.
+ */
+const PLATFORM_TIMEOUT_MS = 5000;
 
 export interface YeriaPlatformConfig {
     appId: string;
@@ -73,7 +87,7 @@ export class YeriaPlatform {
      * verification without holding the key yourself, use `verifyYeriaToken`
      * (kid resolver via YeriaPublicKeys) instead.
      */
-    async getYeriaPublicKey(opts?: { fetch?: typeof fetch }): Promise<YeriaPublicKey> {
+    async getYeriaPublicKey(opts?: { fetch?: typeof fetch; timeoutMs?: number }): Promise<YeriaPublicKey> {
         if (!this.config.baseUrl) {
             throw new ConfigurationError('getYeriaPublicKey requires baseUrl in config.');
         }
@@ -85,7 +99,10 @@ export class YeriaPlatform {
 
         let res: Response;
         try {
-            res = await fetchImpl(url, { method: 'GET' });
+            res = await fetchImpl(url, {
+                method: 'GET',
+                signal: timeoutSignal(opts?.timeoutMs ?? this.config.notificationTimeout ?? PLATFORM_TIMEOUT_MS)
+            });
         } catch (error) {
             throw new ExternalError(
                 ERROR_CODES.NOTIFICATION_FAILED,
@@ -154,7 +171,7 @@ export class YeriaPlatform {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(signedNotification),
-                signal: AbortSignal.timeout(this.config.notificationTimeout || 5000)
+                signal: timeoutSignal(this.config.notificationTimeout || 5000)
             });
 
             if (!response.ok) {
@@ -192,7 +209,7 @@ export class YeriaPlatform {
             newPublicKey: newKeys.publicKey,
             timestamp: Date.now()
         };
-        const payload = JSON.stringify(envelope);
+        const payload = stringifyForSigning(envelope);
         const signature = this.config.signer.signPayload(payload);
 
         const url = `${yeriaApiBaseUrl.replace(/\/+$/, '')}/api/v1/services/${serviceId}/keys/rotate`;
@@ -206,7 +223,7 @@ export class YeriaPlatform {
                     signature,
                     currentPublicKey: this.config.signer.getServicePublicKey()
                 }),
-                signal: AbortSignal.timeout(this.config.notificationTimeout || 5000)
+                signal: timeoutSignal(this.config.notificationTimeout || 5000)
             });
         } catch (error) {
             throw new ExternalError(
@@ -248,6 +265,7 @@ export class YeriaPlatform {
     async fetchUserDetails(opts: {
         userServiceToken: string;
         fetch?: typeof fetch;
+        timeoutMs?: number;
     }): Promise<UserDetails> {
         if (!this.config.baseUrl) throw new Error('fetchUserDetails: baseUrl is required (set baseUrl in YeriaAppConfig)');
         const token = opts?.userServiceToken;
@@ -278,7 +296,7 @@ export class YeriaPlatform {
             timestamp: Date.now(),
             nonce: randomBytes(16).toString('hex'),
         };
-        const payloadStr = JSON.stringify(envelope);
+        const payloadStr = stringifyForSigning(envelope);
         const signature = this.config.signer.signPayload(payloadStr);
 
         const baseUrl = this.config.baseUrl.replace(/\/+$/, '');
@@ -287,6 +305,7 @@ export class YeriaPlatform {
         const res = await fetchImpl(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: timeoutSignal(opts.timeoutMs ?? this.config.notificationTimeout ?? PLATFORM_TIMEOUT_MS),
             body: JSON.stringify({ envelope, signature }),
         });
 

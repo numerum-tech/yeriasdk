@@ -49,7 +49,6 @@ class IconGridView(BaseActionView):
 
         self.content = {
             "title": title,
-            "intro": "",
             "shape": "circle",
             "columns": 4,
             "spacing": 12,

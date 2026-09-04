@@ -6,7 +6,10 @@ import sanitizeHtmlLib from 'sanitize-html';
 
 export interface ReaderContent {
     title: string;
-    intro: string;
+    /** Absent tant que setIntro n'a pas été appelé — une clé vide obligerait
+     *  chaque renderer à distinguer « pas d'introduction » de « introduction
+     *  vide », ce que tous ne font pas. */
+    intro?: string;
     elements: ReaderElement[];
 }
 
@@ -69,7 +72,6 @@ export class ReaderView extends BaseView {
 
         this.content = {
             title: title,
-            intro: '',
             elements: []
         } as ReaderContent;
     }

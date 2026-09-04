@@ -2,7 +2,7 @@
 MessageView - A view for displaying messages to users
 """
 
-from typing import Literal, Optional, Dict, Any
+from typing import Literal, Optional, Dict, Any, Union
 from datetime import datetime
 
 from ..core.base_view import BaseView
@@ -46,12 +46,9 @@ class MessageView(BaseView):
 
         self.content = {
             "title": title,
-            "intro": "",
             "body": "",
             "severity": "info",
-            "confirm": {"text": "OK", "method": "POST"},
-            "cancel": None,
-            "canDismiss": False,
+            "actions": [],
         }
 
     def set_intro(self, intro: str) -> "MessageView":
@@ -71,48 +68,103 @@ class MessageView(BaseView):
         self.content["severity"] = severity
         return self
 
+    def add_action(
+        self,
+        label: str,
+        go: Optional[str] = None,
+        method: Optional[HttpMethod] = None,
+        back: Optional[Union[int, str]] = None,
+    ) -> "MessageView":
+        """Add a button to the box. Two at most.
+
+        Sans ``go``, il FERME et ne fait rien d'autre. Avec ``go``, il charge
+        cette vue, qui entre dans la pile selon ses propres regles.
+
+        Sans aucune action, le client dessine un unique « OK » qui ferme : une
+        boite a toujours une sortie, comme une MsgBox en avait toujours une.
+
+        Un identifiant de vue nu est refuse, comme partout ailleurs : rien sur
+        le fil ne le distingue d'un chemin relatif.
+        """
+        trimmed = (label or "").strip()
+        if not trimmed:
+            raise InvalidParameterError(
+                "label", label, "Action label cannot be empty"
+            )
+
+        actions = self.content["actions"]
+        if len(actions) >= 2:
+            raise InvalidParameterError(
+                "actions", len(actions) + 1, "A message carries two actions at most"
+            )
+
+        if go is not None and back is not None:
+            raise InvalidParameterError(
+                "back",
+                back,
+                "an action either loads a view (`go`) or steps back (`back`), not both",
+            )
+
+        action: Dict[str, Any] = {"label": trimmed}
+        if back is not None:
+            # Reculer ne recharge RIEN : l'ecran vise est deja dans la pile,
+            # avec l'etat ou l'utilisateur l'avait laisse. 'root' y revient
+            # sans compter — c'est la seule position qu'un fournisseur
+            # connaisse a coup sur, la vue servie par son URL de base.
+            if back != "root":
+                if isinstance(back, bool) or not isinstance(back, int) or back < 1:
+                    raise InvalidParameterError(
+                        "back", back, "back must be an integer >= 1, or 'root'"
+                    )
+            action["back"] = back
+            if method is not None:
+                raise InvalidParameterError(
+                    "method", method, "method only applies to an action that carries `go`"
+                )
+        elif go is not None:
+            action["go"] = self._assert_addressable_target("go", go)
+            if method is not None:
+                action["method"] = method
+        elif method is not None:
+            raise InvalidParameterError(
+                "method", method, "method only applies to an action that carries `go`"
+            )
+
+        actions.append(action)
+        return self
+
+    def clear_actions(self) -> "MessageView":
+        """Remove every action."""
+        self.content["actions"] = []
+        return self
+
     def set_primary_action(
         self, text: str, method: HttpMethod = "POST", confirm_message: Optional[str] = None
     ) -> "MessageView":
-        """Configure primary action"""
-        if not text or not text.strip():
-            raise InvalidParameterError("text", text, "Primary action text cannot be empty")
+        """Nom historique.
 
-        self.content["confirm"] = {
-            "text": text.strip(),
-            "method": method,
-            "confirmMessage": confirm_message,
-        }
-        return self
+        La destination voyageait dans ``confirm_message``, un champ nomme pour
+        un texte de confirmation — c'est ``go`` desormais.
+        """
+        if confirm_message is None:
+            return self.add_action(text)
+        return self.add_action(text, go=confirm_message, method=method)
 
     def submit_button(
         self, text: str, method: HttpMethod = "POST", confirm_message: Optional[str] = None
     ) -> "MessageView":
-        """Alias for set_primary_action (compatibility)"""
+        """Nom historique de add_action."""
         return self.set_primary_action(text, method, confirm_message)
 
     def set_secondary_action(
         self, text: str, method: HttpMethod = "POST", confirm_message: Optional[str] = None
     ) -> "MessageView":
-        """Configure secondary action"""
-        if not text or not text.strip():
-            raise InvalidParameterError("text", text, "Secondary action text cannot be empty")
-
-        self.content["cancel"] = {
-            "text": text.strip(),
-            "method": method,
-            "confirmMessage": confirm_message,
-        }
-        return self
+        """Nom historique : la seconde action."""
+        return self.set_primary_action(text, method, confirm_message)
 
     def clear_secondary_action(self) -> "MessageView":
-        """Remove secondary action if it exists"""
-        self.content["cancel"] = None
-        return self
-
-    def set_dismissible(self, dismissible: bool = True) -> "MessageView":
-        """Set if message can be dismissed without action"""
-        self.content["canDismiss"] = dismissible
+        """Retire la seconde action, si elle existe."""
+        del self.content["actions"][1:]
         return self
 
     def set_metadata(self, metadata: Dict[str, Any]) -> "MessageView":

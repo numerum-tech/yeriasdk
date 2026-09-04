@@ -44,7 +44,6 @@ class ActionListView(BaseActionView):
 
         self.content = {
             "title": title,
-            "intro": "",
             "actions": self._actions,  # Reference to actions from BaseActionView
         }
 

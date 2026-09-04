@@ -6,7 +6,12 @@ from typing import Optional, Literal
 from datetime import datetime
 
 from ..core.base_view import BaseView
-from ..types.models import QRScanContent, QRScanValidation, QRScanPreview, SubmitAction
+from ..types.models import (
+    QRScanContent,
+    QRScanValidation,
+    QRScanPreview,
+    SubmitAction,
+)
 from ..errors.exceptions import InvalidParameterError
 
 
@@ -44,7 +49,6 @@ class QRScanView(BaseView):
 
         self.content: QRScanContent = {
             "title": title,
-            "intro": "",
             "autoSubmit": True,  # Auto-submit by default
         }
 
@@ -55,14 +59,21 @@ class QRScanView(BaseView):
     def submit_button(
         self, text: str, confirm_message: Optional[str] = None
     ) -> "QRScanView":
-        """Configure submit button for manual confirmation"""
+        """Configure submit button for manual confirmation.
+
+        ``confirm_message`` is displayed by renderers as help text on the scan
+        result screen, not as a modal: on a QRScan the tap on this button
+        already IS the confirmation, so a dialog would ask twice.
+        """
         if not text or not text.strip():
             raise InvalidParameterError("text", text, "Button text cannot be empty")
 
         self.content["submit"] = {
             "text": text.strip(),
             "method": "POST",
-            "confirmMessage": confirm_message,
+            "confirmMessage": confirm_message.strip()
+            if confirm_message and confirm_message.strip()
+            else None,
         }
 
         # Disable auto-submit when button is present
@@ -124,13 +135,17 @@ class QRScanView(BaseView):
         self.content["validation"] = validation
         return self
 
-    def enable_preview(
-        self, editable: bool = False, label: Optional[str] = None
-    ) -> "QRScanView":
-        """Enable preview mode where scanned value is shown before submission"""
+    def enable_preview(self, label: Optional[str] = None) -> "QRScanView":
+        """Enable preview mode: the scanned value is echoed back, read-only.
+
+        The preview is never editable — a value the user can retype could be
+        posted as if it had been scanned, which defeats the point of scanning.
+        Only enable it when the scanned value means something to the user; for
+        opaque payloads, auto-submit and return a view describing what the code
+        resolved to instead.
+        """
         self.content["preview"] = {
             "enabled": True,
-            "editable": editable,
             "label": label.strip() if label else "Scanned Code",
         }
         return self
@@ -159,11 +174,8 @@ class QRScanView(BaseView):
                 create_validation_error("Preview mode requires a submit button")
             )
 
-        # If preview is editable, submit button is required
-        if content.get("preview", {}).get("editable") and not content.get("submit"):
-            errors.append(
-                create_validation_error("Editable preview requires a submit button")
-            )
+        # No rule for submit.confirmMessage: it lives inside ``submit``, so it
+        # cannot exist without the step it is displayed on.
 
         return ValidationResult(
             is_valid=len(errors) == 0,

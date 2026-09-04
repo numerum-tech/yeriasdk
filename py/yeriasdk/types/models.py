@@ -46,12 +46,41 @@ MediaKind = Literal["audio", "video"]
 
 CardActionVariant = Literal["primary", "secondary", "link"]
 
+# Where a photo/audio/video field is allowed to take its content from.
+#   record  : capture only — camera/microphone, no picking an existing file.
+#   library : pick only — no capture UI.
+#   both    : the user chooses (default).
+# Use "record" when the point is that the content was produced now.
+CaptureSource = Literal["record", "library", "both"]
+
+# Video capture ceiling. An enum rather than raw numbers so the renderer keeps
+# picking the concrete resolution/bitrate its device actually supports.
+#   low    ~ 480p  / ~1 Mbps   -> ~7 MB per minute
+#   medium ~ 720p  / ~2.5 Mbps -> ~19 MB per minute (default)
+#   high   ~ 1080p / ~4 Mbps   -> ~30 MB per minute
+# Figures are typical mobile-encoder output, not a guarantee — size the
+# provider's request body limit with headroom.
+VideoQuality = Literal["low", "medium", "high"]
+
 
 # Navigation configuration
 @dataclass
 class NavigationConfig:
-    next: Optional[str] = None  # URL or viewId of next view
-    prev: Optional[str] = None  # URL or viewId of previous view
+    # `next` / `prev` are SIBLINGS in a sequence — the two arrows of a
+    # paginated set of views, drawn by the client. They are never bound to the
+    # back gesture: back undoes time, pagination moves sideways.
+    #
+    # `entry` says how THIS view enters the stack when displayed. Only the
+    # provider knows the answer: a receipt replaces the form it acknowledges,
+    # step 2 of a wizard does not replace step 1.
+    #
+    # `page` dit OU l'on se trouve dans la sequence. Des nombres, pas une
+    # phrase : le client les met en forme dans sa langue. `total` est
+    # facultatif, une sequence ouverte n'en connait pas la fin.
+    next: Optional[str] = None  # URL or path of the next view in the sequence
+    prev: Optional[str] = None  # URL or path of the previous view
+    entry: Optional[str] = None  # 'push' (default) | 'replace'
+    page: Optional[Dict[str, int]] = None  # {'current': int, 'total': int?}
 
 
 # Process context for multi-step workflows
@@ -107,7 +136,10 @@ class FormFieldOption:
 
 @dataclass
 class FormFieldParams(FieldValidation):
-    value: Optional[str] = None
+    # For media fields this holds the URL of a file the provider ALREADY has —
+    # a list when the field is `multiple`. With `readonly` it turns the field
+    # into a viewer of stored content instead of a capture control.
+    value: Optional[Union[str, List[str]]] = None
     options: Optional[List[FormFieldOption]] = None
     accept: Optional[List[str]] = None
     live: Optional[bool] = None
@@ -121,6 +153,36 @@ class FormFieldParams(FieldValidation):
     # GPS fields: coarsest fix accepted, in METRES (= min required precision).
     # The app captures until position.accuracy <= max_accuracy.
     max_accuracy: Optional[float] = None
+    # GPS fields: legacy boolean high-accuracy flag, superseded by
+    # `max_accuracy`. Kept because the JS SDK still emits it and a payload that
+    # carries it on one side and not the other does not sign the same.
+    precision: Optional[bool] = None
+
+    # photo / file / audio / video: multi-capture
+    multiple: Optional[bool] = None  # Allow more than one item in this field
+    max_count: Optional[int] = None  # Upper bound when `multiple` is set
+
+    # audio / video: capture constraints
+    # Seconds. Required for video: it is what bounds the upload size.
+    max_duration: Optional[float] = None
+    # Seconds. Rejects an accidental tap-and-release recording.
+    min_duration: Optional[float] = None
+    source: Optional[CaptureSource] = None
+    quality: Optional[VideoQuality] = None  # Video only
+    # Bytes. Client refuses to upload past this, before sending.
+    max_size: Optional[int] = None
+
+    # select: comment presenter les choix. Une PREFERENCE d'affichage, pas un
+    # type de champ — le sens reste « un seul choix parmi plusieurs ».
+    # 'dropdown' (defaut, feuille de selection) | 'radio' (options a plat).
+    # Un client qui ignore la cle retombe sur 'dropdown'.
+    display: Optional[str] = None
+
+    # paragraph: displayed text, never an input. A SIZE, not a role:
+    # 'xl' (24px) | 'lg' (18px) | 'md' (14px, default) | 'sm' (12px)
+    size: Optional[str] = None
+    bold: Optional[bool] = None
+    italic: Optional[bool] = None
 
 
 # Action configuration
@@ -182,10 +244,16 @@ class CardAction:
 @dataclass
 class CardContent:
     title: str
-    subtitle: Optional[str] = None
+    # Ligne de contexte sous le titre — meme cle et meme role que l'`intro`
+    # des onze autres vues. Elle s'appelait `subtitle` ; set_subtitle en
+    # reste l'alias.
+    intro: Optional[str] = None
     description: Optional[str] = None
     badge: Optional[str] = None
     image: Optional[CardImage] = None
+    # Intitule du bloc de statistiques. Absent = pas de titre : le client ne
+    # dessine que ce que le fournisseur a pose, comme pour CardSection.
+    stats_heading: Optional[str] = None
     stats: List[CardStat] = field(default_factory=list)
     sections: List[CardSection] = field(default_factory=list)
     actions: List[CardAction] = field(default_factory=list)
@@ -215,7 +283,8 @@ class CarouselSettings:
 @dataclass
 class CarouselContent:
     title: str
-    subtitle: Optional[str] = None
+    # Voir CardContent.intro — set_subtitle en reste l'alias.
+    intro: Optional[str] = None
     slides: List[CarouselSlide] = field(default_factory=list)
     settings: Optional[CarouselSettings] = None
 
@@ -511,7 +580,6 @@ class QRScanValidation:
 @dataclass
 class QRScanPreview:
     enabled: bool
-    editable: Optional[bool] = None
     label: Optional[str] = None
 
 

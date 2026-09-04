@@ -11,10 +11,18 @@ import { InvalidParameterError } from '../errors';
  * - Convention: Field name is ALWAYS "qrData" (not configurable)
  * - Auto-submit by default: scan → immediately POST { qrData: "ABC123" }
  * - Submit button disables auto-submit for manual confirmation workflows
+ * - The preview is read-only: a retypable value would let anything be posted
+ *   as if it had been scanned
  *
  * **Submission Convention:**
  * - Auto-submit: POST {service.baseUrl}/{viewId} with { qrData: "scanned-value" }
  * - With button: User scans, previews, clicks button to submit
+ *
+ * **Rejected scans:** when a scanned value fails `validation`, the client stops
+ * the scanner and shows `validation.errorMessage` — it does not silently keep
+ * scanning, and it never echoes the refused value. Write that message so it
+ * states the rule ("must start with PROD- followed by 6 to 12 digits"), not
+ * just "invalid code".
  *
  * Extends {@link BaseView}. Created via the YeriaApp/YeriaUI factory, populated
  * with the builder methods below (setIntro, submitButton, setValidation,
@@ -31,7 +39,7 @@ import { InvalidParameterError } from '../errors';
  * // Manual confirmation workflow
  * const view = new QRScanView('verify-product', 'Verify Product')
  *     .setIntro('Scan the product barcode')
- *     .enablePreview(true, 'Product Code')
+ *     .enablePreview('Product Code')
  *     .submitButton('Verify Product');
  * // → Scans, shows preview, user clicks "Verify Product" to submit
  *
@@ -61,7 +69,6 @@ export class QRScanView extends BaseView {
 
         this.content = {
             title,
-            intro: '',
             autoSubmit: true  // Auto-submit by default
         } as QRScanContent;
     }
@@ -85,7 +92,11 @@ export class QRScanView extends BaseView {
      * **Note**: QRScan submissions are always POST (convention-based security)
      *
      * @param text - Button text like "Confirm", "Process", "Submit"
-     * @param confirmMessage - Optional confirmation dialog
+     * @param confirmMessage - Optional message to show with the scanned value.
+     *                   Renderers display it as help text on the scan result
+     *                   screen, not as a modal: on a QRScan the tap on this
+     *                   button already IS the confirmation, so a dialog would
+     *                   ask the same question twice.
      * @returns this for chaining
      *
      * @example
@@ -93,7 +104,7 @@ export class QRScanView extends BaseView {
      * // User must click button after scanning
      *
      * @example
-     * view.submitButton('Process', 'Are you sure?');
+     * view.submitButton('Verify Product', 'Check the reference against the label before validating.');
      */
     submitButton(text: string, confirmMessage?: string): this {
         if (!text || text.trim().length === 0) {
@@ -103,7 +114,7 @@ export class QRScanView extends BaseView {
         (this.content as QRScanContent).submit = {
             text: text.trim(),
             method: 'POST',
-            confirmMessage
+            confirmMessage: confirmMessage?.trim() || undefined
         };
 
         // Disable auto-submit when button is present
@@ -209,21 +220,27 @@ export class QRScanView extends BaseView {
     }
 
     /**
-     * Enables preview mode where scanned value is shown before submission
+     * Enables preview mode: the scanned value is echoed back, read-only,
+     * before submission.
      * **Note**: Requires submit button to be set
      *
-     * @param editable - Allow user to manually edit the scanned value
+     * The preview is never editable — a value the user can retype could be
+     * posted as if it had been scanned, which defeats the point of scanning.
+     * Only enable it when the scanned value means something to the user (a
+     * ticket reference, an invoice number printed next to the code); for
+     * opaque payloads, auto-submit and return a view describing what the code
+     * resolved to instead.
+     *
      * @param label - Field label in preview (default: "Scanned Code")
      * @returns this for chaining
      *
      * @example
-     * view.enablePreview(true, 'Barcode')
+     * view.enablePreview('Barcode')
      *     .submitButton('Confirm');
      */
-    enablePreview(editable: boolean = false, label?: string): this {
+    enablePreview(label?: string): this {
         (this.content as QRScanContent).preview = {
             enabled: true,
-            editable,
             label: label?.trim() || 'Scanned Code'
         };
 
@@ -278,10 +295,8 @@ export class QRScanView extends BaseView {
             errors.push({ message: 'Preview mode requires a submit button' });
         }
 
-        // If preview is editable, submit button is required
-        if (content.preview?.editable && !content.submit) {
-            errors.push({ message: 'Editable preview requires a submit button' });
-        }
+        // No rule for submit.confirmMessage: it lives inside `submit`, so it
+        // cannot exist without the step it is displayed on.
 
         // Validation without submit button is allowed (auto-submit with validation)
         // But it's recommended to have a button for better UX

@@ -15,7 +15,7 @@ const yeriaApp = new YeriaApp({
 router.get('/', (req: Request, res: Response) => {
   const carousel = YeriaUI
     .createCarouselView('comprehensive-carousel', 'CarouselView')
-    .setSubtitle('Démonstration de toutes les fonctionnalités du carrousel avec divers types de diapositives')
+    .setIntro('Démonstration de toutes les fonctionnalités du carrousel avec divers types de diapositives')
     .setSettings({
       autoplay: true,
       intervalMs: 5000,

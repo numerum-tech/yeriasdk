@@ -1,0 +1,327 @@
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">CarouselView</code> component organizes multiple spotlight slides for mobile hero banners or promotional decks. It's ideal for showcasing featured content, announcements, promotions, or any collection of items that should be displayed in a swipeable carousel format.</p>
+
+<p>Each slide can have:</p>
+
+<ul><li>Title and description</li><li>Badge (optional)</li><li>Image (optional)</li><li>Action buttons</li></ul>
+
+<p>The carousel supports autoplay, looping, and configurable display settings.</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the carousel view</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Always <code class="ys-code">"Carousel"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">CarouselContent</code></td><td>Yes</td><td>Carousel content object</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Carousel title (set in constructor)</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional line of context under the title. Formerly named <code class="ys-code">subtitle</code>.</td></tr><tr><td><code class="ys-code">content.slides</code></td><td><code class="ys-code">CarouselSlide[]</code></td><td>Yes</td><td>Array of slides (at least one required)</td></tr><tr><td><code class="ys-code">content.slides[].id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the slide</td></tr><tr><td><code class="ys-code">content.slides[].title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Slide title</td></tr><tr><td><code class="ys-code">content.slides[].description</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Slide description</td></tr><tr><td><code class="ys-code">content.slides[].badge</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Badge text (e.g., "New", "Featured")</td></tr><tr><td><code class="ys-code">content.slides[].image</code></td><td><code class="ys-code">CardImage</code></td><td>No</td><td>Slide image</td></tr><tr><td><code class="ys-code">content.slides[].image.url</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>Image URL (required if image is set)</td></tr><tr><td><code class="ys-code">content.slides[].image.alt</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Alt text for image</td></tr><tr><td><code class="ys-code">content.slides[].actions</code></td><td><code class="ys-code">CardAction[]</code></td><td>No</td><td>Array of action buttons for the slide</td></tr><tr><td><code class="ys-code">content.slides[].actions[].text</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Button text</td></tr><tr><td><code class="ys-code">content.slides[].actions[].method</code></td><td><code class="ys-code">HttpMethod</code></td><td>No</td><td>HTTP method (default: POST)</td></tr><tr><td><code class="ys-code">content.slides[].actions[].confirmMessage</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional confirmation dialog</td></tr><tr><td><code class="ys-code">content.slides[].actions[].href</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional link URL</td></tr><tr><td><code class="ys-code">content.slides[].actions[].icon</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional icon identifier</td></tr><tr><td><code class="ys-code">content.slides[].actions[].variant</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Button variant: <code class="ys-code">"primary"</code>, <code class="ys-code">"secondary"</code>, <code class="ys-code">"link"</code></td></tr><tr><td><code class="ys-code">content.slides[].meta</code></td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>No</td><td>Optional metadata for the slide</td></tr><tr><td><code class="ys-code">content.settings</code></td><td><code class="ys-code">CarouselSettings</code></td><td>No</td><td>Carousel display settings</td></tr><tr><td><code class="ys-code">content.settings.autoplay</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Enable autoplay (default: false)</td></tr><tr><td><code class="ys-code">content.settings.intervalMs</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Autoplay interval in milliseconds (default: 6000)</td></tr><tr><td><code class="ys-code">content.settings.loop</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Enable looping (default: true)</td></tr><tr><td><code class="ys-code">content.settings.showIndicators</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Show slide indicators (default: true)</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Process identifier for multi-step workflows</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>No</td><td>View metadata (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Introduction text</td><td><code class="ys-code">this</code></td><td>Sets the line of context shown beneath the carousel heading. Refuses a blank value</td></tr><tr><td><code class="ys-code">setSubtitle(subtitle)</code></td><td><code class="ys-code">subtitle</code> - Introduction text</td><td><code class="ys-code">this</code></td><td>Historical name of <code class="ys-code">setIntro</code>, kept. Writes the same key</td></tr><tr><td><code class="ys-code">setSettings(settings)</code></td><td><code class="ys-code">settings</code> - CarouselSettings object</td><td><code class="ys-code">this</code></td><td>Overrides default autoplay and indicator behavior</td></tr><tr><td><code class="ys-code">addSlide(slide)</code></td><td><code class="ys-code">slide</code> - CarouselSlide object</td><td><code class="ys-code">this</code></td><td>Adds a prepared slide to the carousel</td></tr><tr><td><code class="ys-code">createSlide(id, title, description?, options?)</code></td><td><code class="ys-code">id</code> - Slide ID<br><code class="ys-code">title</code> - Slide title<br><code class="ys-code">description</code> - Optional description<br><code class="ys-code">options</code> - Slide options (imageUrl, imageAlt, badge)</td><td><code class="ys-code">CarouselSlide</code></td><td>Creates a slide object (does not add it)</td></tr><tr><td><code class="ys-code">addSlideAction(slideId, text, method?, options?)</code></td><td><code class="ys-code">slideId</code> - Slide ID<br><code class="ys-code">text</code> - Button text<br><code class="ys-code">method</code> - HTTP method (default: POST)<br><code class="ys-code">options</code> - Action options (confirmMessage, href, icon, variant)</td><td><code class="ys-code">this</code></td><td>Adds an action button to a specific slide</td></tr><tr><td><code class="ys-code">clearSlides()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Removes all slides from the carousel</td></tr><tr><td><code class="ys-code">getContent()</code></td><td>-</td><td><code class="ys-code">CarouselContent</code></td><td>Returns the complete carousel content object</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Serves the view with validation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Returns JSON representation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - State key<br><code class="ys-code">value</code> - State value</td><td><code class="ys-code">void</code></td><td>Sets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - State key</td><td><code class="ys-code">unknown</code></td><td>Gets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL or path of the next view</td><td><code class="ys-code">this</code></td><td>Forward control of a paginated sequence, drawn by the client — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL or path of the previous view</td><td><code class="ys-code">this</code></td><td>Backward control of the same sequence. NOT where the back gesture leads — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, or an integer &lt;= 1</td><td><code class="ys-code">this</code></td><td>How this view enters the client's navigation stack (default: <code class="ys-code">push</code>) — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - 1-based position<br><code class="ys-code">total</code> - sequence length, when known</td><td><code class="ys-code">this</code></td><td>Where this view sits in its sequence; the client draws the indicator — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Process ID<br><code class="ys-code">context</code> - Process context</td><td><code class="ys-code">this</code></td><td>Sets process context (inherited from BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">JavaScript Sample Code</h2>
+
+<h3 id="basic-carousel">Basic Carousel</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const carousel = yeriaApp
+    .createCarouselView('home-carousel', 'Featured')
+    .addSlide(
+        carousel.createSlide('release-2-0', 'Version 2.0', 'Discover new features', {
+            imageUrl: 'https://example.com/banners/release.jpg',
+            badge: 'New'
+        })
+    )
+    .addSlide(
+        carousel.createSlide('case-study', 'Case Study', 'How ACME doubled productivity', {
+            imageUrl: 'https://example.com/banners/case-study.jpg'
+        })
+    );
+
+const response = yeriaApp.serve(carousel);</code></pre>
+
+<h3 id="carousel-with-autoplay">Carousel with Autoplay</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const carousel = yeriaApp
+    .createCarouselView('promotions', 'Special Offers')
+    .setIntro('Limited time offers')
+    .addSlide(
+        carousel.createSlide('offer-1', 'Offer 1', 'Description 1', {
+            imageUrl: 'https://example.com/offer1.jpg',
+            badge: '50% Off'
+        })
+    )
+    .addSlide(
+        carousel.createSlide('offer-2', 'Offer 2', 'Description 2', {
+            imageUrl: 'https://example.com/offer2.jpg'
+        })
+    )
+    .setSettings({
+        autoplay: true,
+        intervalMs: 5000,  // 5 seconds
+        loop: true,
+        showIndicators: true
+    });</code></pre>
+
+<h3 id="carousel-with-actions">Carousel with Actions</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const carousel = yeriaApp
+    .createCarouselView('featured', 'Featured Content')
+    .addSlide(
+        carousel.createSlide('article-1', 'Article 1', 'Read our latest article', {
+            imageUrl: 'https://example.com/article1.jpg'
+        })
+    )
+    .addSlide(
+        carousel.createSlide('article-2', 'Article 2', 'Another great read', {
+            imageUrl: 'https://example.com/article2.jpg'
+        })
+    )
+    .addSlideAction('article-1', 'Read More', 'GET', { 
+        href: '/articles/1',
+        variant: 'primary'
+    })
+    .addSlideAction('article-2', 'Read More', 'GET', { 
+        href: '/articles/2',
+        variant: 'primary'
+    });</code></pre>
+
+<h3 id="carousel-with-multiple-actions-per-slide">Carousel with Multiple Actions per Slide</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const carousel = yeriaApp
+    .createCarouselView('products', 'Featured Products')
+    .addSlide(
+        carousel.createSlide('product-1', 'Product 1', 'Amazing product', {
+            imageUrl: 'https://example.com/product1.jpg',
+            badge: 'Popular'
+        })
+    );
+
+carousel
+    .addSlideAction('product-1', 'Buy Now', 'POST', { 
+        confirmMessage: 'Add to cart?',
+        variant: 'primary'
+    })
+    .addSlideAction('product-1', 'View Details', 'GET', { 
+        href: '/products/1',
+        variant: 'secondary'
+    })
+    .addSlideAction('product-1', 'Share', 'POST', { variant: 'link' });</code></pre>
+
+<h3 id="carousel-with-full-slide-object">Carousel with Full Slide Object</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const carousel = yeriaApp
+    .createCarouselView('announcements', 'Announcements')
+    .addSlide({
+        id: 'announcement-1',
+        title: 'New Feature',
+        description: 'We\'ve added a new feature',
+        badge: 'New',
+        image: {
+            url: 'https://example.com/announcement1.jpg',
+            alt: 'Announcement 1'
+        },
+        actions: [
+            {
+                text: 'Learn More',
+                method: 'GET',
+                href: '/features/new',
+                variant: 'primary'
+            }
+        ],
+        meta: {
+            category: 'feature',
+            priority: 'high'
+        }
+    });</code></pre>
+
+<h3 id="carousel-with-custom-settings">Carousel with Custom Settings</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const carousel = yeriaApp
+    .createCarouselView('banner', 'Banner')
+    .setIntro('Scroll through our content')
+    .addSlide(
+        carousel.createSlide('slide-1', 'Slide 1', 'First slide')
+    )
+    .addSlide(
+        carousel.createSlide('slide-2', 'Slide 2', 'Second slide')
+    )
+    .addSlide(
+        carousel.createSlide('slide-3', 'Slide 3', 'Third slide')
+    )
+    .setSettings({
+        autoplay: false,      // Manual navigation only
+        loop: false,          // Don't loop (stop at end)
+        showIndicators: true  // Show dots
+    });</code></pre>
+
+<h3 id="carousel-clearing-slides">Carousel Clearing Slides</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const carousel = yeriaApp
+    .createCarouselView('dynamic-carousel', 'Dynamic Carousel')
+    .addSlide(
+        carousel.createSlide('slide-1', 'Slide 1', 'Description 1')
+    )
+    .addSlide(
+        carousel.createSlide('slide-2', 'Slide 2', 'Description 2')
+    );
+
+// Clear all slides
+carousel.clearSlides();
+
+// Add new slides
+carousel
+    .addSlide(
+        carousel.createSlide('new-slide-1', 'New Slide 1', 'New description 1')
+    )
+    .addSlide(
+        carousel.createSlide('new-slide-2', 'New Slide 2', 'New description 2')
+    );</code></pre>
+
+<h3 id="carousel-in-process-workflow">Carousel in Process Workflow</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const carousel = yeriaApp
+    .createCarouselView('onboarding-steps', 'Get Started')
+    .setProcess('onboarding', {
+        processName: 'User Onboarding',
+        currentStep: 1,
+        totalSteps: 3
+    })
+    .setIntro('Learn about our features')
+    .addSlide(
+        carousel.createSlide('step-1', 'Step 1', 'Create your account', {
+            imageUrl: 'https://example.com/step1.jpg'
+        })
+    )
+    .addSlide(
+        carousel.createSlide('step-2', 'Step 2', 'Complete your profile', {
+            imageUrl: 'https://example.com/step2.jpg'
+        })
+    )
+    .addSlide(
+        carousel.createSlide('step-3', 'Step 3', 'Start using the app', {
+            imageUrl: 'https://example.com/step3.jpg'
+        })
+    )
+    .setSettings({
+        autoplay: true,
+        intervalMs: 4000,
+        loop: true,
+        showIndicators: true
+    });</code></pre>
+
+<h3 id="complex-carousel-example">Complex Carousel Example</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const carousel = yeriaApp
+    .createCarouselView('homepage-hero', 'Welcome')
+    .setIntro('Discover what we offer')
+    .addSlide(
+        carousel.createSlide('feature-1', 'Feature 1', 'Amazing feature description', {
+            imageUrl: 'https://example.com/feature1.jpg',
+            badge: 'New'
+        })
+    )
+    .addSlide(
+        carousel.createSlide('feature-2', 'Feature 2', 'Another great feature', {
+            imageUrl: 'https://example.com/feature2.jpg'
+        })
+    )
+    .addSlide(
+        carousel.createSlide('feature-3', 'Feature 3', 'Yet another feature', {
+            imageUrl: 'https://example.com/feature3.jpg',
+            badge: 'Popular'
+        })
+    )
+    .addSlideAction('feature-1', 'Try Now', 'POST', { variant: 'primary' })
+    .addSlideAction('feature-1', 'Learn More', 'GET', { 
+        href: '/features/1',
+        variant: 'secondary'
+    })
+    .addSlideAction('feature-2', 'Get Started', 'POST', { variant: 'primary' })
+    .addSlideAction('feature-3', 'Explore', 'GET', { 
+        href: '/features/3',
+        variant: 'primary'
+    })
+    .setSettings({
+        autoplay: true,
+        intervalMs: 5000,
+        loop: true,
+        showIndicators: true
+    });</code></pre>
+
+<h2 id="complete-json-example">Complete JSON Example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "home-carousel",
+  "type": "Carousel",
+  "content": {
+    "title": "Featured Content",
+    "intro": "Scroll through our highlights",
+    "slides": [
+      {
+        "id": "release-2-0",
+        "title": "Version 2.0",
+        "description": "Discover the new features",
+        "image": {
+          "url": "https://cdn.example.com/banners/release.jpg",
+          "alt": "Version 2.0 Release"
+        },
+        "badge": "New",
+        "actions": [
+          {
+            "code": "read-more",
+            "title": "Read More",
+            "method": "GET",
+            "href": "/blog/version-2-0",
+            "variant": "link"
+          }
+        ]
+      },
+      {
+        "id": "case-study",
+        "title": "Case Study",
+        "description": "How ACME doubled productivity",
+        "image": {
+          "url": "https://cdn.example.com/banners/case-study.jpg",
+          "alt": "Case Study"
+        },
+        "actions": [
+          {
+            "code": "view-case-study",
+            "title": "View Case Study",
+            "method": "GET",
+            "href": "/case-studies/acme",
+            "variant": "primary"
+          }
+        ]
+      },
+      {
+        "id": "tutorial",
+        "title": "Tutorial",
+        "description": "Learn the basics in 5 minutes",
+        "image": {
+          "url": "https://cdn.example.com/banners/tutorial.jpg",
+          "alt": "Tutorial"
+        },
+        "actions": [
+          {
+            "code": "start-tutorial",
+            "title": "Start Tutorial",
+            "method": "POST",
+            "variant": "primary"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "autoplay": true,
+      "intervalMs": 5000,
+      "loop": true,
+      "showIndicators": true
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

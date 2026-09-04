@@ -2,6 +2,7 @@ import { createPublicKey, generateKeyPairSync, sign } from 'crypto';
 import { Notification } from '../notification';
 import { SecureNotificationResponse } from '../../types';
 import { DecodedPayload, SignedEnvelope } from '../yeria-protocol';
+import { stringifyForSigning } from '../../utils/signing-json';
 
 export interface YeriaKeyPair {
     privateKey: string;
@@ -62,14 +63,14 @@ export class YeriaSigner {
     /** Wrap a view in a v3 `{payload, signature}` envelope signed over the payload bytes. */
     signView(view: Record<string, unknown>, appId: string, timestamp: number = Date.now()): SignedEnvelope {
         const decoded: DecodedPayload = { appId, timestamp, view };
-        const payload = JSON.stringify(decoded);
+        const payload = stringifyForSigning(decoded);
         return { payload, signature: this.signPayload(payload) };
     }
 
     /** Sign a notification into a SecureNotificationResponse (signature over the payload bytes). */
     signNotification(notification: Notification, appId: string, timestamp: number = Date.now()): SecureNotificationResponse {
         const notificationJson = notification.toJSON();
-        const payload = JSON.stringify({
+        const payload = stringifyForSigning({
             notification: notificationJson,
             timestamp,
             appId

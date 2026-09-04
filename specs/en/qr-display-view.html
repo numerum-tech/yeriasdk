@@ -1,0 +1,148 @@
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">QRDisplayView</code> component displays a single QR code for users to scan with their devices. Common use cases include sharing access codes, tickets, payment information, or any data that needs to be transferred via QR code.</p>
+
+<p>The QR code can be provided as an image URL or base64-encoded data URI. The component supports a single QR code with title, description, and configuration options.</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the QR display view</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Always <code class="ys-code">"QRDisplay"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">QRDisplayContent</code></td><td>Yes</td><td>QR display content object</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>View title displayed to the user</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Introduction text displayed before the QR code</td></tr><tr><td><code class="ys-code">content.submit</code></td><td><code class="ys-code">SubmitAction</code></td><td>No</td><td>Optional submit button for actions (e.g., Share, Export)</td></tr><tr><td><code class="ys-code">content.submit.text</code></td><td><code class="ys-code">string</code></td><td>Yes*</td><td>Button text (required if submit is set)</td></tr><tr><td><code class="ys-code">content.submit.method</code></td><td><code class="ys-code">HttpMethod</code></td><td>No</td><td>HTTP method (default: POST)</td></tr><tr><td><code class="ys-code">content.qrImage</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>QR code image URL or base64 data URI</td></tr><tr><td><code class="ys-code">content.qrTitle</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Title for the QR code</td></tr><tr><td><code class="ys-code">content.qrDescription</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Description text for the QR code</td></tr><tr><td><code class="ys-code">content.qrConfig</code></td><td><code class="ys-code">QRConfig</code></td><td>No</td><td>QR code display configuration</td></tr><tr><td><code class="ys-code">content.qrConfig.size</code></td><td><code class="ys-code">number</code></td><td>No</td><td>QR code size in pixels</td></tr><tr><td><code class="ys-code">content.qrConfig.errorCorrection</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Error correction level: <code class="ys-code">"L"</code>, <code class="ys-code">"M"</code>, <code class="ys-code">"Q"</code>, <code class="ys-code">"H"</code></td></tr><tr><td><code class="ys-code">content.qrConfig.margin</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Margin around QR code</td></tr><tr><td><code class="ys-code">content.qrConfig.color</code></td><td><code class="ys-code">object</code></td><td>No</td><td>Color configuration</td></tr><tr><td><code class="ys-code">content.qrConfig.color.dark</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Dark color (foreground)</td></tr><tr><td><code class="ys-code">content.qrConfig.color.light</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Light color (background)</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Process identifier for multi-step workflows</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>No</td><td>View metadata (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Introduction text</td><td><code class="ys-code">this</code></td><td>Sets the introduction text displayed before the QR code</td></tr><tr><td><code class="ys-code">submitButton(text, method?)</code></td><td><code class="ys-code">text</code> - Button text<br><code class="ys-code">method</code> - HTTP method (default: POST)</td><td><code class="ys-code">this</code></td><td>Defines submit button for QR display actions</td></tr><tr><td><code class="ys-code">setQRCode(qrImage, title, description, config?)</code></td><td><code class="ys-code">qrImage</code> - QR image URL or base64<br><code class="ys-code">title</code> - QR code title<br><code class="ys-code">description</code> - QR code description<br><code class="ys-code">config</code> - QRConfig options</td><td><code class="ys-code">this</code></td><td>Sets the QR code to display (replaces any existing QR code)</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Serves the view with validation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Returns JSON representation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - State key<br><code class="ys-code">value</code> - State value</td><td><code class="ys-code">void</code></td><td>Sets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - State key</td><td><code class="ys-code">unknown</code></td><td>Gets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL or path of the next view</td><td><code class="ys-code">this</code></td><td>Forward control of a paginated sequence, drawn by the client — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL or path of the previous view</td><td><code class="ys-code">this</code></td><td>Backward control of the same sequence. NOT where the back gesture leads — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, or an integer &lt;= 1</td><td><code class="ys-code">this</code></td><td>How this view enters the client's navigation stack (default: <code class="ys-code">push</code>) — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - 1-based position<br><code class="ys-code">total</code> - sequence length, when known</td><td><code class="ys-code">this</code></td><td>Where this view sits in its sequence; the client draws the indicator — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Process ID<br><code class="ys-code">context</code> - Process context</td><td><code class="ys-code">this</code></td><td>Sets process context (inherited from BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">JavaScript Sample Code</h2>
+
+<h3 id="basic-qr-display">Basic QR Display</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const qrDisplay = yeriaApp
+    .createQRDisplayView('qrcode', 'Your QR Code')
+    .setIntro('This code gives you access to premium services')
+    .setQRCode(
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'Subscription Code',
+        'Scan this code to activate your subscription',
+        { size: 200, errorCorrection: 'Q' }
+    );
+
+const response = yeriaApp.serve(qrDisplay);</code></pre>
+
+<h3 id="qr-display-with-url">QR Display with URL</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('ticket-qr', 'Your Ticket')
+    .setIntro('Present this QR code at the venue')
+    .setQRCode(
+        'https://example.com/qr/ticket-12345.png',
+        'Event Ticket',
+        'Scan this QR code for entry',
+        {
+            size: 250,
+            errorCorrection: 'H',
+            margin: 4
+        }
+    );</code></pre>
+
+<h3 id="qr-display-with-custom-colors">QR Display with Custom Colors</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('branded-qr', 'Branded QR Code')
+    .setIntro('Scan our branded QR code')
+    .setQRCode(
+        'https://example.com/qr/branded.png',
+        'Brand QR',
+        'Scan to visit our website',
+        {
+            size: 220,
+            errorCorrection: 'Q',
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            }
+        }
+    );</code></pre>
+
+<h3 id="qr-display-with-submit-button">QR Display with Submit Button</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('share-qr', 'Share QR Code')
+    .setIntro('Share this QR code with others')
+    .setQRCode(
+        'https://example.com/qr/share.png',
+        'Share Code',
+        'Scan to share access',
+        { size: 200 }
+    )
+    .submitButton('Share', 'POST');</code></pre>
+
+<h3 id="qr-display-with-high-error-correction">QR Display with High Error Correction</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('durable-qr', 'Durable QR Code')
+    .setIntro('This QR code can handle damage')
+    .setQRCode(
+        'https://example.com/qr/durable.png',
+        'Durable Code',
+        'High error correction for damaged codes',
+        {
+            size: 300,
+            errorCorrection: 'H',  // Highest error correction
+            margin: 4
+        }
+    );</code></pre>
+
+<h3 id="qr-display-in-process-workflow">QR Display in Process Workflow</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('verification-qr', 'Verification QR')
+    .setProcess('verification', {
+        processName: 'Account Verification',
+        currentStep: 3,
+        totalSteps: 3,
+        stepName: 'Display QR'
+    })
+    .setIntro('Scan this QR code to complete verification')
+    .setQRCode(
+        'https://example.com/qr/verify.png',
+        'Verification Code',
+        'Scan to verify your account',
+        { size: 250, errorCorrection: 'Q' }
+    )
+    .submitButton('Complete Verification', 'POST');</code></pre>
+
+<h2 id="complete-json-example">Complete JSON Example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "ticket-qr",
+  "type": "QRDisplay",
+  "content": {
+    "title": "Your Ticket",
+    "intro": "Present this QR code at the venue",
+    "submit": {
+      "text": "Share",
+      "method": "POST"
+    },
+    "qrImage": "https://example.com/qr/ticket-12345.png",
+    "qrTitle": "Event Ticket",
+    "qrDescription": "Scan this QR code for entry",
+    "qrConfig": {
+      "size": 250,
+      "errorCorrection": "H",
+      "margin": 4,
+      "color": {
+        "dark": "#000000",
+        "light": "#FFFFFF"
+      }
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

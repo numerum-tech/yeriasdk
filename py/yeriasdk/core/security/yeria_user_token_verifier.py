@@ -25,6 +25,17 @@ def _b64url_decode(data: str) -> bytes:
     return base64.urlsafe_b64decode(padded)
 
 
+def _render(value: Any) -> str:
+    """Rend une valeur pour un message d'erreur, comme le fait le SDK JS.
+
+    `!r` l'entourait de guillemets, si bien que les deux SDK rapportaient le
+    meme rejet dans deux formulations differentes. Une clef absente s'ecrit
+    `undefined` des deux cotes plutot que `None` d'un cote et `undefined` de
+    l'autre — le message est un diagnostic partage, pas de la prose Python.
+    """
+    return "undefined" if value is None else str(value)
+
+
 class YeriaUserTokenVerifier:
     """Verifies a Yeria-ISSUED USER JWT (RS256): enforces ``iss='yeria'``, an
     optional ``aud=<serviceId>``, and ``exp > now``. Static-only helper.
@@ -62,7 +73,7 @@ class YeriaUserTokenVerifier:
             raise SignatureVerificationError("yeria", "invalid base64 / json")
 
         if header.get("alg") != "RS256":
-            raise SignatureVerificationError("yeria", f"unsupported alg: {header.get('alg')!r}")
+            raise SignatureVerificationError("yeria", f"unsupported alg: {_render(header.get('alg'))}")
 
         signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
         public_key_obj = serialization.load_pem_public_key(yeria_public_key.encode(), backend=default_backend())
@@ -72,11 +83,12 @@ class YeriaUserTokenVerifier:
             raise SignatureVerificationError("yeria", "signature mismatch")
 
         if claims_raw.get("iss") != "yeria":
-            raise SignatureVerificationError("yeria", f"unexpected issuer: {claims_raw.get('iss')!r}")
+            raise SignatureVerificationError("yeria", f"unexpected issuer: {_render(claims_raw.get('iss'))}")
         if expected_audience is not None and claims_raw.get("aud") != str(expected_audience):
             raise SignatureVerificationError(
                 "yeria",
-                f"audience mismatch: token aud={claims_raw.get('aud')!r}, expected={str(expected_audience)!r}",
+                f"audience mismatch: token aud={_render(claims_raw.get('aud'))}, "
+                f"expected={expected_audience}",
             )
 
         now_sec = int(time.time())

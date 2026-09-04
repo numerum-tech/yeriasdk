@@ -1,6 +1,8 @@
 import { BaseView } from './base-view';
 import {
+    ActionRef,
     GeoPoint,
+    HeatmapPoint,
     MapBasemap,
     MapContent,
     MapControls,
@@ -10,6 +12,7 @@ import {
     MapShape,
     MapShapeStyle,
     MapViewport,
+    MarkerPopup,
     MarkersLayer,
     ShapesLayer
 } from '../types';
@@ -22,6 +25,201 @@ import {
     LayerTypeMismatchError,
     MissingRequiredParameterError
 } from '../errors';
+
+/**
+ * Drops the keys left `undefined`, so an unset field is absent rather than
+ * present-and-undefined. `JSON.stringify` would drop it anyway; this keeps the
+ * in-memory object honest too, and matches what Python emits.
+ */
+function stripUndefined<T extends object>(obj: T): T {
+    const rec = obj as Record<string, unknown>;
+    for (const key of Object.keys(rec)) {
+        if (rec[key] === undefined) delete rec[key];
+    }
+    return obj;
+}
+
+// ─── wire emitters ──────────────────────────────────────────────────
+//
+// Every part of the map content is spelt out here rather than spread from
+// the caller's object. `{ ...marker }` carried the CALLER's key order into a
+// signed payload — `{ location, id }` and `{ id, location }` signed
+// differently — and neither matched Python. Each emitter follows the order
+// of its `_*_to_dict` counterpart in py/yeriasdk/views/map_view.py; the
+// byte goldens (`partBytes`) hold the two in step.
+
+function geoToWire(p: GeoPoint): GeoPoint {
+    return stripUndefined({ lat: p.lat, lon: p.lon, altitude: p.altitude, precision: p.precision });
+}
+
+function boundsToWire(b: { sw: GeoPoint; ne: GeoPoint }): { sw: GeoPoint; ne: GeoPoint } {
+    return { sw: geoToWire(b.sw), ne: geoToWire(b.ne) };
+}
+
+function actionToWire(a: ActionRef): ActionRef {
+    return stripUndefined({
+        url: a.url,
+        method: a.method,
+        body: a.body,
+        confirm: a.confirm
+            ? stripUndefined({ title: a.confirm.title, message: a.confirm.message, submitLabel: a.confirm.submitLabel })
+            : undefined
+    });
+}
+
+function styleToWire(s: MapShapeStyle): MapShapeStyle {
+    return stripUndefined({
+        fillColor: s.fillColor,
+        fillOpacity: s.fillOpacity,
+        strokeColor: s.strokeColor,
+        strokeOpacity: s.strokeOpacity,
+        strokeWidth: s.strokeWidth,
+        dashed: s.dashed
+    });
+}
+
+function popupToWire(p: MarkerPopup): MarkerPopup {
+    return stripUndefined({
+        title: p.title,
+        body: p.body,
+        image: p.image,
+        actions: p.actions ? p.actions.map(actionToWire) : undefined
+    });
+}
+
+function markerToWire(m: MapMarker): MapMarker {
+    return stripUndefined({
+        id: m.id.trim(),
+        location: geoToWire(m.location),
+        title: m.title?.trim(),
+        description: m.description?.trim(),
+        icon: m.icon,
+        color: m.color,
+        size: m.size,
+        selected: m.selected,
+        meta: m.meta,
+        action: m.action ? actionToWire(m.action) : undefined,
+        popup: m.popup ? popupToWire(m.popup) : undefined
+    });
+}
+
+// A number that can travel: `NaN` and `±Infinity` have no JSON form —
+// `JSON.stringify` writes `null`, Python's `json.dumps` writes `NaN`, and a
+// signed payload carrying either is one no client can read back. Same rule
+// as the form's numeric fields (`validateNumber`), applied to every number a
+// map carries.
+function isFiniteNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+function assertFiniteIfSet(value: unknown, name: string, ctx: string): void {
+    if (value !== undefined && !isFiniteNumber(value)) {
+        throw new InvalidParameterError(name, value, `${ctx}: ${name} must be a finite number`);
+    }
+}
+
+// GeoJSON `data` is opaque to the SDK and copied whole into the payload, so
+// it is walked whole: a non-finite number anywhere inside it — coordinates,
+// bbox, a property — has no JSON form and is refused.
+function assertNoNonFiniteNumber(value: unknown, ctx: string): void {
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) {
+            throw new InvalidParameterError('data', value, `${ctx}: contains a non-finite number`);
+        }
+        return;
+    }
+    if (Array.isArray(value)) {
+        value.forEach(v => assertNoNonFiniteNumber(v, ctx));
+    } else if (value && typeof value === 'object') {
+        for (const v of Object.values(value as Record<string, unknown>)) assertNoNonFiniteNumber(v, ctx);
+    }
+}
+
+function assertStyleFinite(style: MapShapeStyle, ctx: string): void {
+    assertFiniteIfSet(style.fillOpacity, 'fillOpacity', ctx);
+    assertFiniteIfSet(style.strokeOpacity, 'strokeOpacity', ctx);
+    assertFiniteIfSet(style.strokeWidth, 'strokeWidth', ctx);
+}
+
+// The geometry keys of every shape variant, so one emitter serves all four.
+type ShapeGeometry = { points?: GeoPoint[]; center?: GeoPoint; radius?: number; sw?: GeoPoint; ne?: GeoPoint };
+
+function shapeToWire(s: MapShape): MapShape {
+    const g = s as unknown as ShapeGeometry;
+    return stripUndefined({
+        id: s.id.trim(),
+        type: s.type,
+        points: g.points ? g.points.map(geoToWire) : undefined,
+        center: g.center ? geoToWire(g.center) : undefined,
+        radius: g.radius,
+        sw: g.sw ? geoToWire(g.sw) : undefined,
+        ne: g.ne ? geoToWire(g.ne) : undefined,
+        config: s.config ? styleToWire(s.config) : undefined,
+        action: s.action ? actionToWire(s.action) : undefined,
+        meta: s.meta
+    }) as unknown as MapShape;
+}
+
+function heatPointToWire(p: HeatmapPoint): HeatmapPoint {
+    return stripUndefined({ lat: p.lat, lon: p.lon, intensity: p.intensity });
+}
+
+function layerToWire(layer: MapLayer): MapLayer {
+    // The base keys come first on every layer type, in Python's order; the
+    // spread below is of THIS object, never of the caller's. `id` and `type`
+    // are written per case so the discriminant survives for the type checker.
+    const base = {
+        name: layer.name,
+        legendIcon: layer.legendIcon,
+        visible: layer.visible,
+        toggleable: layer.toggleable,
+        zIndex: layer.zIndex,
+        minZoom: layer.minZoom,
+        maxZoom: layer.maxZoom
+    };
+    switch (layer.type) {
+        case 'markers':
+            return stripUndefined({
+                id: layer.id,
+                type: layer.type,
+                ...base,
+                markers: (layer.markers ?? []).map(markerToWire),
+                cluster: layer.cluster,
+                clusterRadius: layer.clusterRadius
+            });
+        case 'shapes':
+            return stripUndefined({ id: layer.id, type: layer.type, ...base, shapes: (layer.shapes ?? []).map(shapeToWire) });
+        case 'heatmap':
+            return stripUndefined({
+                id: layer.id,
+                type: layer.type,
+                ...base,
+                points: (layer.points ?? []).map(heatPointToWire),
+                radius: layer.radius,
+                intensityMax: layer.intensityMax,
+                colorRamp: layer.colorRamp
+            });
+        case 'tiles':
+            return stripUndefined({
+                id: layer.id,
+                type: layer.type,
+                ...base,
+                url: layer.url,
+                attribution: layer.attribution,
+                maxNativeZoom: layer.maxNativeZoom,
+                opacity: layer.opacity
+            });
+        case 'geojson':
+            return stripUndefined({
+                id: layer.id,
+                type: layer.type,
+                ...base,
+                data: layer.data,
+                defaultMarkerIcon: layer.defaultMarkerIcon,
+                defaultShapeStyle: layer.defaultShapeStyle ? styleToWire(layer.defaultShapeStyle) : undefined
+            });
+    }
+}
 
 /**
  * MapView (v2) — see specs/map-view.md
@@ -78,12 +276,29 @@ export class MapView extends BaseView {
 
     setViewport(viewport: MapViewport): this {
         this.validateViewport(viewport);
-        (this.content as MapContent).viewport = { ...viewport };
+        (this.content as MapContent).viewport = stripUndefined({
+            center: viewport.center ? geoToWire(viewport.center) : undefined,
+            zoom: viewport.zoom,
+            bounds: viewport.bounds ? boundsToWire(viewport.bounds) : undefined,
+            fitMarkers: viewport.fitMarkers,
+            minZoom: viewport.minZoom,
+            maxZoom: viewport.maxZoom,
+            bearing: viewport.bearing,
+            pitch: viewport.pitch
+        });
         return this;
     }
 
     setControls(controls: MapControls): this {
-        (this.content as MapContent).controls = { ...controls };
+        (this.content as MapContent).controls = stripUndefined({
+            zoom: controls.zoom,
+            compass: controls.compass,
+            userLocation: controls.userLocation,
+            layerToggle: controls.layerToggle,
+            scale: controls.scale,
+            fullscreen: controls.fullscreen,
+            attribution: controls.attribution
+        });
         return this;
     }
 
@@ -110,7 +325,22 @@ export class MapView extends BaseView {
         }
         const content = this.content as MapContent;
         content.mode = 'pick';
-        content.pick = { ...config, submitUrl };
+        // Spelt out rather than spread, in Python's emission order: `...config`
+        // let the caller's key order into a signed payload.
+        const pick: Record<string, unknown> = {
+            submitUrl,
+            prompt: config.prompt,
+            initialLocation: config.initialLocation ? geoToWire(config.initialLocation) : undefined,
+            submitMethod: config.submitMethod,
+            submitLabel: config.submitLabel,
+            payloadKey: config.payloadKey,
+            bounds: config.bounds ? boundsToWire(config.bounds) : undefined,
+            snapToMarkers: config.snapToMarkers
+        };
+        for (const key of Object.keys(pick)) {
+            if (pick[key] === undefined) delete pick[key];
+        }
+        content.pick = pick as unknown as MapContent['pick'];
         return this;
     }
 
@@ -128,9 +358,10 @@ export class MapView extends BaseView {
         if (content.layers.some(l => l.id === layer.id)) {
             throw new DuplicateLayerIdError(layer.id);
         }
-        // Shallow copy so callers can't mutate the layer payload after the fact.
-        const copy: MapLayer = { ...layer } as MapLayer;
-        content.layers.push(copy);
+        this.validateLayer(layer);
+        // Rebuilt rather than copied: the caller keeps no handle on the
+        // payload, and the key order is the wire order, not the caller's.
+        content.layers.push(layerToWire(layer));
         return this;
     }
 
@@ -165,12 +396,7 @@ export class MapView extends BaseView {
         this.validateGeoPoint(marker.location, `marker "${marker.id}".location`);
 
         const layer = this.resolveOrCreateMarkersLayer(layerId);
-        layer.markers.push({
-            ...marker,
-            id: marker.id.trim(),
-            title: marker.title?.trim(),
-            description: marker.description?.trim()
-        });
+        layer.markers.push(markerToWire(marker));
         return this;
     }
 
@@ -206,7 +432,7 @@ export class MapView extends BaseView {
         this.validateShape(shape);
 
         const layer = this.resolveOrCreateShapesLayer(layerId);
-        layer.shapes.push({ ...shape, id: shape.id.trim() } as MapShape);
+        layer.shapes.push(shapeToWire(shape));
         return this;
     }
 
@@ -305,11 +531,55 @@ export class MapView extends BaseView {
         if (!p || typeof p !== 'object') {
             throw new InvalidGeoPointError(p, `${ctx}: location is required`);
         }
-        if (typeof p.lat !== 'number' || p.lat < -90 || p.lat > 90) {
-            throw new InvalidGeoPointError(p, `${ctx}: lat must be a number in [-90, 90]`);
+        // `NaN` passes every comparison below, so finiteness comes first.
+        if (!isFiniteNumber(p.lat) || p.lat < -90 || p.lat > 90) {
+            throw new InvalidGeoPointError(p, `${ctx}: lat must be a finite number in [-90, 90]`);
         }
-        if (typeof p.lon !== 'number' || p.lon < -180 || p.lon > 180) {
-            throw new InvalidGeoPointError(p, `${ctx}: lon must be a number in [-180, 180]`);
+        if (!isFiniteNumber(p.lon) || p.lon < -180 || p.lon > 180) {
+            throw new InvalidGeoPointError(p, `${ctx}: lon must be a finite number in [-180, 180]`);
+        }
+        if (p.altitude !== undefined && !isFiniteNumber(p.altitude)) {
+            throw new InvalidGeoPointError(p, `${ctx}: altitude must be a finite number`);
+        }
+        if (p.precision !== undefined && !isFiniteNumber(p.precision)) {
+            throw new InvalidGeoPointError(p, `${ctx}: precision must be a finite number`);
+        }
+    }
+
+    // A layer handed to addLayer carries markers, shapes or points of its
+    // own; they take the same checks as the ones added one by one.
+    private validateLayer(layer: MapLayer): void {
+        const ctx = `layer "${layer.id}"`;
+        assertFiniteIfSet(layer.zIndex, 'zIndex', ctx);
+        assertFiniteIfSet(layer.minZoom, 'minZoom', ctx);
+        assertFiniteIfSet(layer.maxZoom, 'maxZoom', ctx);
+        switch (layer.type) {
+            case 'markers':
+                (layer.markers ?? []).forEach(m => this.validateGeoPoint(m.location, `marker "${m.id}".location`));
+                assertFiniteIfSet(layer.clusterRadius, 'clusterRadius', ctx);
+                break;
+            case 'shapes':
+                (layer.shapes ?? []).forEach(s => this.validateShape(s));
+                break;
+            case 'heatmap':
+                (layer.points ?? []).forEach((p, i) => {
+                    const pctx = `${ctx} points[${i}]`;
+                    if (!isFiniteNumber(p.lat) || !isFiniteNumber(p.lon)) {
+                        throw new InvalidParameterError('points', p, `${pctx}: lat and lon must be finite numbers`);
+                    }
+                    assertFiniteIfSet(p.intensity, 'intensity', pctx);
+                });
+                assertFiniteIfSet(layer.radius, 'radius', ctx);
+                assertFiniteIfSet(layer.intensityMax, 'intensityMax', ctx);
+                break;
+            case 'tiles':
+                assertFiniteIfSet(layer.maxNativeZoom, 'maxNativeZoom', ctx);
+                assertFiniteIfSet(layer.opacity, 'opacity', ctx);
+                break;
+            case 'geojson':
+                assertNoNonFiniteNumber(layer.data, `${ctx}.data`);
+                if (layer.defaultShapeStyle) assertStyleFinite(layer.defaultShapeStyle, ctx);
+                break;
         }
     }
 
@@ -331,8 +601,8 @@ export class MapView extends BaseView {
             }
             case 'Circle': {
                 this.validateGeoPoint(s.center, `Circle "${s.id}" center`);
-                if (typeof s.radius !== 'number' || s.radius <= 0) {
-                    throw new InvalidParameterError('radius', s.radius, 'Circle radius must be > 0 (meters)');
+                if (!isFiniteNumber(s.radius) || s.radius <= 0) {
+                    throw new InvalidParameterError('radius', s.radius, 'Circle radius must be a finite number > 0 (meters)');
                 }
                 break;
             }
@@ -354,9 +624,16 @@ export class MapView extends BaseView {
                 throw new InvalidParameterError('shape.type', (_exhaustive as MapShape).type, 'unknown shape type');
             }
         }
+        if (s.config) assertStyleFinite(s.config, `shape "${s.id}".config`);
     }
 
     private validateViewport(v: MapViewport): void {
+        // `NaN` passes every range check below, so finiteness comes first.
+        for (const key of ['zoom', 'minZoom', 'maxZoom', 'bearing', 'pitch'] as const) {
+            if (v[key] !== undefined && !isFiniteNumber(v[key])) {
+                throw new InvalidViewportError(`${key} must be a finite number`);
+            }
+        }
         if (v.center) this.validateGeoPoint(v.center, 'viewport.center');
         if (v.bounds) {
             this.validateGeoPoint(v.bounds.sw, 'viewport.bounds.sw');

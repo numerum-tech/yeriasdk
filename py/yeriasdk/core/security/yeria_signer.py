@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from ..yeria_protocol import SignedEnvelope
+from ...utils.signing_json import dumps_for_signing
 from ...types.models import SecureNotificationResponse
 
 
@@ -81,7 +82,7 @@ class YeriaSigner:
             timestamp = int(time.time() * 1000)
         # Compact separators to byte-match JS JSON.stringify (parity: identical
         # signed bytes across SDKs).
-        payload = json.dumps({"appId": app_id, "timestamp": timestamp, "view": view}, separators=(",", ":"))
+        payload = dumps_for_signing({"appId": app_id, "timestamp": timestamp, "view": view})
         return SignedEnvelope(payload=payload, signature=self.sign_payload(payload))
 
     def sign_notification(self, notification: Any, app_id: str, timestamp: Optional[int] = None) -> SecureNotificationResponse:
@@ -103,9 +104,8 @@ class YeriaSigner:
             "message": message,
         }
         # Compact separators to byte-match JS JSON.stringify.
-        payload = json.dumps(
-            {"notification": notification_dict, "timestamp": timestamp, "appId": app_id},
-            separators=(",", ":"),
+        payload = dumps_for_signing(
+            {"notification": notification_dict, "timestamp": timestamp, "appId": app_id}
         )
         return SecureNotificationResponse(
             app_id=app_id,

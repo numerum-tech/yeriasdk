@@ -14,7 +14,7 @@ from ..core.yeria_link import YeriaLink
 class CardView(BaseView):
     """Builds a Card SGUI view — a compact "product sheet" spotlighting a single item.
 
-    Header, badge and image are set via ``set_subtitle`` / ``set_description`` /
+    Header, badge and image are set via ``set_intro`` / ``set_description`` /
     ``set_badge`` / ``set_image``; ``add_stat``, ``add_section`` and
     ``add_action`` fill the highlight metrics, body sections and footer buttons.
 
@@ -43,8 +43,6 @@ class CardView(BaseView):
 
         self.content = {
             "title": title,
-            "subtitle": "",
-            "description": "",
             "badge": None,
             "image": None,
             "stats": [],
@@ -53,14 +51,24 @@ class CardView(BaseView):
             "meta": None,
         }
 
-    def set_subtitle(self, subtitle: str) -> "CardView":
-        """Set the subtitle displayed under the main title"""
-        self.content["subtitle"] = subtitle.strip()
+    def set_intro(self, intro: str) -> "CardView":
+        """Set the line of context displayed under the main title
+
+        Meme contrat que partout ailleurs : un texte d'en-tete se pose ou ne
+        se pose pas. Stocker '' faisait reserver au renderer une ligne vide.
+        """
+        self._set_intro_text("intro", intro)
         return self
+
+    def set_subtitle(self, subtitle: str) -> "CardView":
+        """Nom historique de set_intro, conserve : la carte disait `subtitle`
+        la ou les onze autres vues disent `intro`. Ecrit la meme cle.
+        """
+        return self.set_intro(subtitle)
 
     def set_description(self, description: str) -> "CardView":
         """Set the long-form description for the card body"""
-        self.content["description"] = description.strip()
+        self._set_intro_text("description", description)
         return self
 
     def set_badge(self, badge: Optional[str]) -> "CardView":
@@ -80,6 +88,16 @@ class CardView(BaseView):
     def clear_image(self) -> "CardView":
         """Clear the image"""
         self.content["image"] = None
+        return self
+
+    def set_stats_heading(self, heading: str) -> "CardView":
+        """Name the stats block
+
+        Facultatif : sans intitule la grille est dessinee nue, exactement
+        comme une section sans ``heading``. Le client n'invente jamais de
+        titre de son cru.
+        """
+        self._set_intro_text("statsHeading", heading)
         return self
 
     def add_stat(self, label: str, value: str) -> "CardView":

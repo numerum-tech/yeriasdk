@@ -31,9 +31,15 @@ describe('QRScanView - Simplified Design Tests', () => {
             expect((json.content as any)['autoSubmit']).toBe(true);
         });
 
-        it('should initialize with empty intro', () => {
+        it('omits intro until it is set', () => {
+            // Une clé vide obligerait chaque renderer à distinguer « pas
+            // d'introduction » de « introduction vide » — et tous ne le font
+            // pas : le lecteur mobile réservait 51 px de bande blanche.
             const json = view.toJSON();
-            expect((json.content as any)['intro']).toBe('');
+            expect((json.content as any)['intro']).toBeUndefined();
+
+            view.setIntro('Scannez le code');
+            expect((view.toJSON().content as any)['intro']).toBe('Scannez le code');
         });
 
         it('should accept optional processId', () => {
@@ -92,11 +98,11 @@ describe('QRScanView - Simplified Design Tests', () => {
             expect(action?.method).toBe('POST');
         });
 
-        it('should accept confirmation message', () => {
-            view.submitButton('Process', 'Are you sure?');
+        it('should accept a confirmation message', () => {
+            view.submitButton('Process', 'Check the reference on the label.');
 
             const action = (view.toJSON().content as any)['submit'];
-            expect(action?.confirmMessage).toBe('Are you sure?');
+            expect(action?.confirmMessage).toBe('Check the reference on the label.');
         });
 
         it('should automatically disable auto-submit when button is added', () => {
@@ -265,21 +271,22 @@ describe('QRScanView - Simplified Design Tests', () => {
 
             const preview = (view.toJSON().content as any)['preview'];
             expect(preview?.enabled).toBe(true);
-            expect(preview?.editable).toBe(false);
             expect(preview?.label).toBe('Scanned Code');
         });
 
-        it('should enable editable preview', () => {
-            view.enablePreview(true, 'Barcode');
+        // The preview is display-only by design: a value the user can retype
+        // could be posted as if it had been scanned.
+        it('should never emit an editable flag', () => {
+            view.enablePreview('Barcode');
             view.submitButton('Confirm');
 
             const preview = (view.toJSON().content as any)['preview'];
-            expect(preview?.editable).toBe(true);
+            expect(preview?.editable).toBeUndefined();
             expect(preview?.label).toBe('Barcode');
         });
 
         it('should use default label if not provided', () => {
-            view.enablePreview(false);
+            view.enablePreview();
             view.submitButton('Confirm');
 
             const preview = (view.toJSON().content as any)['preview'];
@@ -287,7 +294,7 @@ describe('QRScanView - Simplified Design Tests', () => {
         });
 
         it('should trim label text', () => {
-            view.enablePreview(false, '  Product Code  ');
+            view.enablePreview('  Product Code  ');
             view.submitButton('Confirm');
 
             const preview = (view.toJSON().content as any)['preview'];
@@ -295,7 +302,7 @@ describe('QRScanView - Simplified Design Tests', () => {
         });
 
         it('should disable preview', () => {
-            view.enablePreview(true, 'Test');
+            view.enablePreview('Test');
             view.submitButton('Confirm');
             expect(((view.toJSON().content as any)['preview']?.enabled ?? false)).toBe(true);
 
@@ -361,16 +368,8 @@ describe('QRScanView - Simplified Design Tests', () => {
             expect(result.errors).toContainEqual({ message: 'Preview mode requires a submit button' });
         });
 
-        it('should reject editable preview without submit button', () => {
-            view.enablePreview(true);
-
-            const result = view.validate();
-            expect(result.isValid).toBe(false);
-            expect(result.errors).toContainEqual({ message: 'Editable preview requires a submit button' });
-        });
-
         it('should accept preview with submit button', () => {
-            view.enablePreview(true, 'Code')
+            view.enablePreview('Code')
                 .submitButton('Confirm');
 
             const result = view.validate();
@@ -402,7 +401,8 @@ describe('QRScanView - Simplified Design Tests', () => {
 
         it('should serialize manual submit view', () => {
             view.setIntro('Scan code')
-                .submitButton('Process', 'Confirm?');
+                .enablePreview('Code')
+                .submitButton('Process', 'Compare with the printed reference.');
 
             const json = view.toJSON();
 
@@ -410,7 +410,7 @@ describe('QRScanView - Simplified Design Tests', () => {
             expect((json.content as any)['submit']).toEqual({
                 text: 'Process',
                 method: 'POST',
-                confirmMessage: 'Confirm?'
+                confirmMessage: 'Compare with the printed reference.'
             });
         });
 
@@ -428,14 +428,13 @@ describe('QRScanView - Simplified Design Tests', () => {
         });
 
         it('should serialize preview configuration', () => {
-            view.enablePreview(true, 'Product Code')
+            view.enablePreview('Product Code')
                 .submitButton('Confirm');
 
             const json = view.toJSON();
             const preview = (json.content as any)['preview'];
 
             expect(preview.enabled).toBe(true);
-            expect(preview.editable).toBe(true);
             expect(preview.label).toBe('Product Code');
         });
 
@@ -480,7 +479,7 @@ describe('QRScanView - Simplified Design Tests', () => {
         it('should support manual confirmation workflow', () => {
             const scanView = new QRScanView('verify-product', 'Verify Product')
                 .setIntro('Scan the product barcode')
-                .enablePreview(false, 'Product Code')
+                .enablePreview('Product Code')
                 .submitButton('Verify Product');
 
             const json = scanView.toJSON();
@@ -515,26 +514,28 @@ describe('QRScanView - Simplified Design Tests', () => {
             // 4. If invalid: show error "Invalid invoice format"
         });
 
-        it('should support editable preview with validation', () => {
+        it('should support read-only preview with validation and a confirmation message', () => {
             const scanView = new QRScanView('enter-code', 'Enter Access Code')
-                .setIntro('Scan or manually enter the code')
+                .setIntro('Scan the access code')
                 .setValidation('Must be 6 digits', 'number', 6, 6)
-                .enablePreview(true, 'Access Code')
-                .submitButton('Submit Code');
+                .enablePreview('Access Code')
+                .submitButton('Submit Code', 'Check the code against the one on your invitation.');
 
             const json = scanView.toJSON();
 
             expect((json.content as any)['autoSubmit']).toBe(false);
             expect((json.content as any)['validation']).toBeDefined();
             expect((json.content as any)['validation'].format).toBe('number');
-            expect((json.content as any)['preview']?.editable).toBe(true);
+            expect((json.content as any)['preview']?.enabled).toBe(true);
+            expect((json.content as any)['submit']?.confirmMessage).toBe(
+                'Check the code against the one on your invitation.'
+            );
 
             // Mobile app flow:
             // 1. User scans → gets "123456"
-            // 2. Shows editable preview: "Access Code: 123456"
-            // 3. User can edit the value
-            // 4. On "Submit Code": validate format=number and length 6-6
-            // 5. If valid: POST {qrData: "123456"}
+            // 2. Shows read-only preview: "Access Code: 123456" + the message as help text
+            // 3. On "Submit Code": re-validate format=number and length 6-6
+            // 4. If valid: POST {qrData: "123456"}
         });
     });
 
@@ -543,7 +544,7 @@ describe('QRScanView - Simplified Design Tests', () => {
             const result = view
                 .setIntro('Scan product')
                 .setValidation('Invalid product code', 'number', undefined, undefined, 'PROD-')
-                .enablePreview(true, 'Product')
+                .enablePreview('Product')
                 .submitButton('Process')
                 .setAutoSubmit(false);
 
@@ -563,7 +564,7 @@ describe('QRScanView - Simplified Design Tests', () => {
         it('should clone view with all configuration', () => {
             view.setIntro('Test')
                 .setValidation('Error', 'number', 6, 6)
-                .enablePreview(true, 'Code')
+                .enablePreview('Code')
                 .submitButton('Submit');
 
             const cloned = view.clone();

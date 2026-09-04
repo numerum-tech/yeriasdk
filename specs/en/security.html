@@ -1,0 +1,80 @@
+<p>Two signing mechanisms frame a Yeria service: you sign the views you return, Yeria signs the user tokens you receive. Both are verified, never assumed.</p>
+
+<h2 id="deux-cles">The two keys</h2>
+
+<div class="ys-table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Key</th>
+                <th>Algorithm</th>
+                <th>Owner</th>
+                <th>Role</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Platform key</td>
+                <td>RSA (RS256)</td>
+                <td>Yeria</td>
+                <td>Signs user tokens. You only verify; the SDK fetches and caches the key by its <code class="ys-code">kid</code>.</td>
+            </tr>
+            <tr>
+                <td>Service key</td>
+                <td>Ed25519</td>
+                <td>You</td>
+                <td>Signs view envelopes and your calls to Yeria. The public half is registered; the private half never leaves your backend.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<p>Generating an RSA keypair for your service is a mistake: the registry rejects anything that is not Ed25519.</p>
+
+<h2 id="cle-privee">The private key</h2>
+
+<div class="ys-callout ys-callout-key">
+    <span class="ys-callout-mark"><i class="bi bi-key-fill" aria-hidden="true"></i></span>
+    <div>
+        <div class="ys-callout-title">It is your service's identity</div>
+        <p style="margin-bottom:0">Never commit it, never send it to Yeria, never ship it in a mobile build. Anyone holding it can sign views and calls as you. If it leaks, rotate immediately.</p>
+    </div>
+</div>
+
+<h2 id="enveloppe">The signed envelope</h2>
+
+<p><code class="ys-code">app.serve(view)</code> produces a v3 envelope:</p>
+
+<pre class="ys-codeblock" data-lang="json"><code>{ "payload": "{\"type\":\"FormView\",…}", "signature": "…" }</code></pre>
+
+<div class="ys-callout ys-callout-info">
+    <span class="ys-callout-mark">i</span>
+    <p>The signature covers the bytes of the <code class="ys-code">payload</code> string, which is parsed afterwards. Never reformat the JSON once signed: verification would fail.</p>
+</div>
+
+<p>The app verifies the signature before rendering the screen. A view it cannot verify is refused — it is not rendered in a degraded form.</p>
+
+<h2 id="jetons">Verifying inbound tokens</h2>
+
+<p>Yeria is a registry and an identity provider, not a proxy: the app calls your URL directly. Verifying every token you receive is therefore your job.</p>
+
+<pre class="ys-codeblock" data-lang="js"><code>const user = await app.verifyUserToken(bearer, process.env.YERIA_SERVICE_ID);</code></pre>
+
+<p>Passing your service id pins the audience: a token minted for another service is rejected. The platform key is fetched once and cached, so later verifications make no network call.</p>
+
+<div class="ys-callout ys-callout-warning">
+    <span class="ys-callout-mark">!</span>
+    <p>The SDK ships helpers, not middleware. There is no <code class="ys-code">YeriaApp.authMiddleware()</code>: wiring it into your framework stays your call.</p>
+</div>
+
+<h2 id="rotation">Key rotation</h2>
+
+<p>On an already approved service, changing the public key is a registry edit: it is staged as a draft and applied when the review is approved. Emergency rotation, after a leak, follows a separate path described in <a href="/docs/integration">Provider integration</a>.</p>
+
+<h2 id="transport">Transport and exposure</h2>
+
+<ul>
+    <li>Your backend must be reachable over HTTPS from user devices.</li>
+    <li>No business data transits through Yeria: traffic goes from the phone to your server.</li>
+    <li>Views carry an expiry; an expired view is refused by the app.</li>
+</ul>

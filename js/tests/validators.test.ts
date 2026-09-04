@@ -121,10 +121,25 @@ describe('DataSanitizer - Security Tests', () => {
 
         it('should reject invalid URLs', () => {
             expect(DataSanitizer.validateURL('not-a-url')).toBe(false);
-            // javascript: is technically a valid URL but dangerous - URL constructor accepts it
-            // This is why we have validateSubmissionURL which blocks javascript: protocol
-            expect(DataSanitizer.validateURL('javascript:alert(1)')).toBe(true);
-            expect(DataSanitizer.validateURL('ftp://example.com')).toBe(true); // FTP is technically valid URL
+            expect(DataSanitizer.validateURL('https://')).toBe(false);
+            expect(DataSanitizer.validateURL('/relative/path')).toBe(false);
+        });
+
+        // These used to be asserted as VALID, on the grounds that the URL
+        // constructor accepts them and that validateSubmissionURL blocks the
+        // dangerous schemes. But validateSubmissionURL guards a submission
+        // TARGET, and this function guards the pre-filled value of a `url`
+        // field — a different path, with no second line of defence, whose
+        // value the renderer puts in front of the user. The Python SDK
+        // refused them all along, so the two SDKs also disagreed on what a
+        // valid view was.
+        it('rejects every scheme the client cannot meaningfully open', () => {
+            expect(DataSanitizer.validateURL('javascript:alert(1)')).toBe(false);
+            expect(DataSanitizer.validateURL('vbscript:msgbox')).toBe(false);
+            expect(DataSanitizer.validateURL('data:text/html,<script>x</script>')).toBe(false);
+            expect(DataSanitizer.validateURL('file:///etc/passwd')).toBe(false);
+            expect(DataSanitizer.validateURL('ftp://example.com')).toBe(false);
+            expect(DataSanitizer.validateURL('mailto:a@b.c')).toBe(false);
         });
     });
 

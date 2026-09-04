@@ -1,44 +1,65 @@
-# YeriaApp Main Class Specification
+# YeriaUI & YeriaApp — SDK entry points
 
 ## Description
 
-The `YeriaApp` class is the main entry point for creating secure, signed views. It provides factory methods for creating all view types and handles Ed25519 signature generation and verification for view integrity.
+The SDK exposes **two** objects to providers. The split is by secret ownership.
 
-**Key Features:**
-- Automatic Ed25519 key pair generation (if not provided)
-- Secure view signing with timestamps
-- View expiration management
-- Signature verification
-- Factory methods for all view types
+| Object | Holds a key? | Role |
+|---|---|---|
+| `YeriaUI` | No | View **factory**. Builds typed views. Pure, stateless, never instantiated — used like `Math` or `JSON`. |
+| `YeriaApp` | Yes (Ed25519) | Everything that needs the private key: **signing** views, verifying inbound user tokens, notifications, key rotation. |
 
-## Configuration
+Building is keyless; signing is not. You build a view with `YeriaUI`, then hand
+it to `app.serve(view)` — a role handoff, not a round-trip on one object.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `appId` | `string` | Yes | Unique application identifier |
-| `privateKey` | `string` | No | Ed25519 private key (PEM format). Auto-generated if not provided |
-| `publicKey` | `string` | No | Ed25519 public key (PEM format). Auto-generated if not provided |
-| `allowedDomains` | `string[]` | No | Allowed domains for view serving (default: []) |
-| `viewExpirationMinutes` | `number` | No | View expiration time in minutes (default: 60) |
-
-## Methods
-
-### Constructor
+Everything else (`YeriaSigner`, `YeriaPublicKeys`, the platform client, the
+verifiers) is **internal**. It is not exported and you should not reach for it.
 
 ```javascript
-new YeriaApp(config: YeriaAppConfig)
+import { YeriaUI, YeriaApp } from '@numerum-tech/yeriasdk';
+
+const app = new YeriaApp({
+    appId: process.env.YERIA_APP_ID,
+    baseUrl: process.env.YERIA_BASE_URL,
+    privateKey: process.env.SERVICE_ED25519_PRIVATE_KEY,
+});
+
+const view = YeriaUI.createFormView('registration', 'User Registration')
+    .addTextField('name', 'Name', true)
+    .submitButton('Register', 'POST');
+
+return app.serve(view);   // → { payload, signature }
 ```
 
-Creates a new YeriaApp instance with the provided configuration.
+---
 
-### Factory Methods
+## The two key systems
 
-All factory methods create and return view instances:
+Do not confuse them. They serve different directions of traffic.
+
+| Key | Algorithm | Who owns it | What it does |
+|---|---|---|---|
+| Yeria platform key | RSA (**RS256**) | Yeria | Signs the user tokens your backend receives. You only ever **verify** with it — the SDK fetches and caches it for you. |
+| Your service key | **Ed25519** | You | Signs the view envelopes you return, and the provider→Yeria calls. Registered as a public key on your service; the private half never leaves your backend. |
+
+`app.verifyUserToken()` rejects any token whose header `alg` is not `RS256`.
+View envelopes and provider-signed envelopes are always Ed25519.
+
+---
+
+## YeriaUI — the view factory
+
+Keyless. Import and use directly; there is no constructor.
+
+### Factory methods
+
+Each returns a fresh typed view builder.
 
 - `createFormView(formId: string, title: string, processId?: string): FormView`
 - `createReaderView(viewId: string, title: string, processId?: string): ReaderView`
 - `createActionListView(viewId: string, title: string, processId?: string): ActionListView`
 - `createActionGridView(viewId: string, title: string, processId?: string): ActionGridView`
+- `createIconGridView(viewId: string, title: string, processId?: string): IconGridView`
 - `createQRScanView(viewId: string, title: string, processId?: string): QRScanView`
 - `createQRDisplayView(viewId: string, title: string, processId?: string): QRDisplayView`
 - `createMessageView(viewId: string, title: string, processId?: string): MessageView`
@@ -48,343 +69,202 @@ All factory methods create and return view instances:
 - `createMediaView(viewId: string, title: string, processId?: string): MediaView`
 - `createMapView(viewId: string, title: string, processId?: string): MapView`
 
-### Serving Views
+### Rehydrating a stored view
 
 ```javascript
-serve(view: BaseView): SecureViewResponse
+fromJson(json: Record<string, unknown>): BaseView
 ```
 
-Generates a signed response for a view. Returns an object with:
-- `appId`: Application identifier
-- `signature`: Ed25519 signature (base64)
-- `timestamp`: Timestamp in milliseconds
-- `view`: The view JSON object
+Turns wire JSON (a static template, or a view you persisted in your own DB)
+back into a typed, validated view instance. Use it when you store screens as
+JSON rather than rebuilding them field by field:
 
 ```javascript
-serveRawView(view: Record<string, unknown>): SignedEnvelope
+const view = YeriaUI.fromJson(await db.screens.get('home'));
+return app.serve(view);
 ```
 
-Signs a pre-built view JSON block directly. This is intended for providers that mostly return static screens and do not need the builder API for every field.
-
-### Verification
+### Unsigned error body
 
 ```javascript
-verifyIntegrity(response: SecureViewResponse): boolean
+error(spec: ProviderErrorSpec): ProviderErrorBody
 ```
 
-Verifies the integrity of a secure view response. Throws errors if:
-- AppId doesn't match
-- View has expired
-- Signature is invalid
+Builds an error body byte-identical to the platform's own error shape, without
+a signature. Use it when you have no key at hand (startup failure, config
+error). When you *do* have a key, prefer `app.serveError()` — a signed error
+is one the mobile can trust.
 
-### Static Methods
+---
+
+## YeriaApp — the key holder
+
+### Configuration
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `appId` | `string` | Yes | Unique application identifier. Carried inside every signed payload. |
+| `privateKey` | `string` | No | Ed25519 private key, PEM (PKCS#8). Generated on the fly if omitted — fine for tests, never for production. |
+| `publicKey` | `string` | No | Ed25519 public key, PEM (SPKI). Derived from `privateKey` when omitted. |
+| `baseUrl` | `string` | No | Yeria base URL, e.g. `https://yeria.app`. Required for `verifyUserToken`, `notify`, `fetchUserDetails`, `rotateKey`. |
+| `allowedDomains` | `string[]` | No | Allowed domains for view serving (default `[]`). |
+| `viewExpirationMinutes` | `number` | No | View lifetime used by `verifyIntegrity` (default `60`). |
+| `notificationTimeout` | `number` | No | HTTP timeout in ms for platform calls (default `5000`). |
+
+### Serving views
 
 ```javascript
-static verifySignature(
-    publicKey: string,
-    response: SecureViewResponse,
-    onError?: (error: Error) => void
-): boolean
+serve(view: BaseView): SignedEnvelope
 ```
 
-Static method to verify a signature on the frontend/client side.
+Signs a view into a v3 envelope. This is the **single** signing path — send the
+result as-is:
 
 ```javascript
-static signView(
-    view: Record<string, unknown>,
-    appId: string,
-    privateKey: string,
-    timestamp?: number
-): SecureViewResponse
+res.json(app.serve(view));
 ```
 
-Static method to sign a view without creating a YeriaApp instance.
-
-### Public Key Access
-
 ```javascript
-getPublicKey(): string
+serveError(spec: ProviderErrorSpec): SignedEnvelope
 ```
 
-Returns the public key for client-side verification.
+Same envelope, carrying an error instead of a view. The mobile verifies the
+signature before showing anything, so a signed error cannot be spoofed by a
+network attacker. The `status` field is advisory — the mobile does not rely on
+the HTTP status code.
 
-## SecureViewResponse Type
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `appId` | `string` | Application identifier |
-| `signature` | `string` | Ed25519 signature (base64 encoded) |
-| `timestamp` | `number` | Timestamp in milliseconds |
-| `view` | `Record<string, unknown>` | The view JSON object |
-
-## Methods
-
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `constructor(config)` | `config` - YeriaAppConfig object | `YeriaApp` | Creates a new YeriaApp instance |
-| `createFormView(formId, title, processId?)` | `formId` - Form identifier<br>`title` - Form title<br>`processId` - Optional process ID | `FormView` | Creates a form view |
-| `createReaderView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `ReaderView` | Creates a reader view |
-| `createActionListView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `ActionListView` | Creates an action list view |
-| `createActionGridView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `ActionGridView` | Creates an action grid view |
-| `createQRScanView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `QRScanView` | Creates a QR scan view |
-| `createQRDisplayView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `QRDisplayView` | Creates a QR display view |
-| `createMessageView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `MessageView` | Creates a message view |
-| `createCardView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `CardView` | Creates a card view |
-| `createCarouselView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `CarouselView` | Creates a carousel view |
-| `createTimelineView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `TimelineView` | Creates a timeline view |
-| `createMediaView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `MediaView` | Creates a media view |
-| `createMapView(viewId, title, processId?)` | `viewId` - View identifier<br>`title` - View title<br>`processId` - Optional process ID | `MapView` | Creates a map view |
-| `serve(view)` | `view` - BaseView instance | `SecureViewResponse` | Generates a signed response for a view |
-| `serveRawView(view)` | `view` - plain view JSON object | `SignedEnvelope` | Signs a pre-built static view payload |
-| `verifyIntegrity(response)` | `response` - SecureViewResponse object | `boolean` | Verifies the integrity of a secure view response |
-| `getPublicKey()` | - | `string` | Returns the public key for client-side verification |
-| `static verifySignature(publicKey, response, onError?)` | `publicKey` - Public key (PEM)<br>`response` - SecureViewResponse<br>`onError` - Optional error callback | `boolean` | Static method to verify signature on client side |
-| `static signView(view, appId, privateKey, timestamp?)` | `view` - View object<br>`appId` - Application ID<br>`privateKey` - Private key (PEM)<br>`timestamp` - Optional timestamp | `SecureViewResponse` | Static method to sign a view without creating YeriaApp instance |
-
-## JavaScript Sample Code
-
-### Basic Usage
+### SignedEnvelope
 
 ```javascript
-import { YeriaApp } from '@numerum-tech/yeriasdk';
+{
+  payload: string,     // JSON string: {"appId":…,"timestamp":…,"view":{…}}
+  signature: string    // Ed25519 signature over the payload STRING BYTES, base64
+}
+```
 
-// Initialize with auto-generated keys
-const yeriaApp = new YeriaApp({
-    appId: 'my-app',
-    viewExpirationMinutes: 30
+The signature covers the exact bytes of `payload`. A verifier must check those
+bytes **before** parsing the JSON — re-serializing first would change the bytes
+and break the signature.
+
+### Verification & keys
+
+| Method | Returns | Description |
+|---|---|---|
+| `verifyIntegrity(envelope: SignedEnvelope)` | `boolean` | Verifies an envelope this app signed. Throws when the appId mismatches, the view has expired, or the signature is invalid. |
+| `getServicePublicKey()` | `string` | Your service's Ed25519 public key (PEM). This is the value you register on your Yeria service. |
+
+### Inbound user tokens
+
+```javascript
+async verifyUserToken(
+    bearerToken: string,
+    expectedAudience?: string | number,
+): Promise<YeriaTokenClaims>
+```
+
+Verifies a Yeria-issued user token (RS256). Resolves the token's `kid` against
+Yeria's public keys through an internal, TTL-cached key store — you never wire
+a resolver or hold PEMs yourself. Enforces `iss='yeria'` and `exp > now`; pass
+`expectedAudience` to pin the token to your service id.
+
+Throws `YeriaPlatformUnreachableError` when Yeria cannot be reached (surface
+`503` — the token might be fine). An unknown or expired key surfaces as a
+verification error (surface `401`).
+
+### User details
+
+```javascript
+async fetchUserDetails(opts: {
+    userServiceToken: string;
+    fetch?: typeof fetch;
+}): Promise<UserDetails>
+```
+
+Fetches a Yeria user's profile, **authorized by the user's own live service
+token** — not by your notification preferences and not by a bearer token in the
+body. The credential on the wire is the Ed25519 signature over the envelope.
+
+### Notifications
+
+| Method | Returns | Description |
+|---|---|---|
+| `signNotification(notification: Notification)` | `SecureNotificationResponse` | Signs without sending. |
+| `async notify(notification: Notification)` | `Promise<void>` | Signs and POSTs to Yeria. |
+
+See [Notifications](notification.md) for delivery rules and subscription errors.
+
+### Key rotation
+
+```javascript
+async rotateKey(...)
+```
+
+Registers a new Ed25519 public key for your service. The retired key stays
+valid for a short grace window so in-flight requests do not break.
+
+### Static escape hatches
+
+Prefer the instance methods. These exist for the rare case where you already
+hold the exact PEM, or want no network at all.
+
+| Method | Description |
+|---|---|
+| `static verifySignature(publicKey, payload, signature, onError?)` | Raw Ed25519 verify over a payload string against a PEM. |
+| `static signView(view, appId, privateKey, timestamp?)` | Sign a view into a `SignedEnvelope` from a one-off key. |
+| `static verifyYeriaToken(jwt, yeriaPublicKey, expectedAudience?)` | Verify a user token against a known PEM. Pure, no network. |
+| `static async verifyYeriaTokenWithResolver(jwt, resolver, expectedAudience?)` | Same, but you supply the `kid` resolver. |
+
+---
+
+## Complete example
+
+```javascript
+import express from 'express';
+import { YeriaUI, YeriaApp } from '@numerum-tech/yeriasdk';
+
+const app = new YeriaApp({
+    appId: process.env.YERIA_APP_ID,
+    baseUrl: process.env.YERIA_BASE_URL,
+    privateKey: process.env.SERVICE_ED25519_PRIVATE_KEY,
 });
 
-// Get public key for client verification
-const publicKey = yeriaApp.getPublicKey();
+const server = express();
 
-// Create and serve a view
-const form = yeriaApp
-    .createFormView('registration', 'User Registration')
-    .addTextField('name', 'Name', true)
-    .submitButton('Register', 'POST');
+server.get('/screens/registration', async (req, res) => {
+    const bearer = (req.headers.authorization ?? '').replace(/^Bearer /i, '');
 
-const response = yeriaApp.serve(form);
-// Response: { appId, signature, timestamp, view }
+    try {
+        const claims = await app.verifyUserToken(bearer, process.env.YERIA_SERVICE_ID);
 
-// Verify integrity
-const isValid = yeriaApp.verifyIntegrity(response);
-```
+        const form = YeriaUI.createFormView('registration', 'User Registration')
+            .setIntro(`Welcome, ${claims.sub}`)
+            .addTextField('name', 'Name', true)
+            .addEmailField('email', 'Email', true)
+            .submitButton('Register', 'POST');
 
-### Serving a Static JSON View
-
-```javascript
-const response = yeriaApp.serveRawView({
-  id: 'home-static',
-  type: 'Reader',
-  content: {
-    title: 'Welcome',
-    body: [
-      { type: 'paragraph', text: 'This screen is mostly static.' }
-    ]
-  }
+        return res.json(app.serve(form));
+    } catch (err) {
+        return res.status(401).json(app.serveError({
+            code: 'auth.invalid_token',
+            message: 'Session expirée, reconnectez-vous.',
+            status: 401,
+        }));
+    }
 });
 ```
 
-## Complete JSON Example (Secure View Response)
-
-When a view is served through `yeriaApp.serve(view)`, it returns a secure response with signature:
+The payload the mobile receives:
 
 ```json
 {
-  "appId": "my-app",
-  "signature": "MEUCIQD...",
-  "timestamp": 1706443200000,
-  "view": {
-    "id": "user-registration",
-    "type": "Form",
-    "content": {
-      "title": "User Registration",
-      "intro": "Please fill in your information",
-      "submit": {
-        "text": "Register",
-        "method": "POST"
-      },
-      "fields": [
-        {
-          "fieldType": "text",
-          "fieldId": "firstName",
-          "fieldLabel": "First Name",
-          "required": true,
-          "placeholder": "Enter your first name"
-        },
-        {
-          "fieldType": "email",
-          "fieldId": "email",
-          "fieldLabel": "Email Address",
-          "required": true,
-          "placeholder": "you@example.com"
-        }
-      ]
-    },
-    "metadata": {
-      "version": "1.0.0",
-      "createdAt": "2025-01-28T10:00:00.000Z"
-    }
-  }
+  "payload": "{\"appId\":\"my-app\",\"timestamp\":1706443200000,\"view\":{\"id\":\"registration\",\"type\":\"Form\",\"content\":{…}}}",
+  "signature": "MEUCIQD…"
 }
 ```
 
-The `signature` field contains an Ed25519 signature of the JSON-serialized `view` object, allowing the mobile app to verify the integrity and authenticity of the view data.
+---
 
-### With Custom Keys
+## See also
 
-```javascript
-import { generateKeyPairSync } from 'crypto';
-
-// Generate Ed25519 key pair
-const keyPair = generateKeyPairSync('ed25519');
-const privateKey = keyPair.privateKey.export({ type: 'pkcs8', format: 'pem' });
-const publicKey = keyPair.publicKey.export({ type: 'spki', format: 'pem' });
-
-// Initialize with custom keys
-const yeriaApp = new YeriaApp({
-    appId: 'my-app',
-    privateKey: privateKey,
-    publicKey: publicKey,
-    viewExpirationMinutes: 60
-});
-```
-
-### Creating Multiple Views
-
-```javascript
-const yeriaApp = new YeriaApp({ appId: 'my-app' });
-
-// Create multiple views
-const views = [
-    yeriaApp.createFormView('form-1', 'Form 1'),
-    yeriaApp.createReaderView('reader-1', 'Reader 1'),
-    yeriaApp.createActionListView('menu', 'Main Menu')
-];
-
-// Serve all views
-const responses = views.map(view => yeriaApp.serve(view));
-```
-
-### Client-Side Verification
-
-```javascript
-// On the client side
-import { YeriaApp } from '@numerum-tech/yeriasdk';
-
-const publicKey = '...'; // Get from server
-const response = {
-    appId: 'my-app',
-    signature: '...',
-    timestamp: 1234567890,
-    view: { ... }
-};
-
-// Verify signature
-const isValid = YeriaApp.verifySignature(publicKey, response, (error) => {
-    console.error('Verification error:', error);
-});
-
-if (isValid) {
-    // Use the view
-    console.log('View is valid:', response.view);
-} else {
-    console.error('View signature is invalid');
-}
-```
-
-### Static Signing
-
-```javascript
-import { YeriaApp } from '@numerum-tech/yeriasdk';
-import { generateKeyPairSync } from 'crypto';
-
-const keyPair = generateKeyPairSync('ed25519');
-const privateKey = keyPair.privateKey.export({ type: 'pkcs8', format: 'pem' });
-
-const view = {
-    id: 'my-view',
-    type: 'Form',
-    content: { ... }
-};
-
-// Sign without creating YeriaApp instance
-const signedResponse = YeriaApp.signView(
-    view,
-    'my-app',
-    privateKey,
-    Date.now()
-);
-```
-
-### Error Handling
-
-```javascript
-import { YeriaApp } from '@numerum-tech/yeriasdk';
-import { 
-    AppIdMismatchError,
-    ViewExpiredError,
-    SignatureVerificationError
-} from '@numerum-tech/yeriasdk';
-
-const yeriaApp = new YeriaApp({ appId: 'my-app' });
-
-try {
-    const response = yeriaApp.serve(view);
-    const isValid = yeriaApp.verifyIntegrity(response);
-} catch (error) {
-    if (error instanceof AppIdMismatchError) {
-        console.error('App ID mismatch:', error.message);
-    } else if (error instanceof ViewExpiredError) {
-        console.error('View expired:', error.message);
-    } else if (error instanceof SignatureVerificationError) {
-        console.error('Invalid signature:', error.message);
-    }
-}
-```
-
-### Complete Example
-
-```javascript
-import { YeriaApp } from '@numerum-tech/yeriasdk';
-
-// Initialize
-const yeriaApp = new YeriaApp({
-    appId: 'example-app',
-    viewExpirationMinutes: 30
-});
-
-// Create a form view
-const form = yeriaApp
-    .createFormView('user-registration', 'User Registration')
-    .setIntro('Please fill in all required fields')
-    .addTextField('firstName', 'First Name', true)
-    .addEmailField('email', 'Email', true)
-    .submitButton('Register', 'POST');
-
-// Serve the view (generates signature)
-const response = yeriaApp.serve(form);
-
-// Response structure:
-// {
-//     appId: 'example-app',
-//     signature: 'base64-encoded-signature',
-//     timestamp: 1234567890123,
-//     view: {
-//         id: 'user-registration',
-//         type: 'Form',
-//         content: { ... }
-//     }
-// }
-
-// Verify integrity (server-side)
-try {
-    const isValid = yeriaApp.verifyIntegrity(response);
-    console.log('View is valid:', isValid);
-} catch (error) {
-    console.error('Verification failed:', error);
-}
-
-// Get public key for client-side verification
-const publicKey = yeriaApp.getPublicKey();
-```
+- [Provider integration](provider-integration.md) — keys, authentication, user profiles, end to end
+- [Component specifications](readme.md) — every view type

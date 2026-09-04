@@ -1,0 +1,89 @@
+<h2 id="description">Description</h2>
+
+<p>Le composant <code class="ys-code">MessageView</code> affiche à l'utilisateur un message, une notification, une alerte ou une confirmation. Il prend en charge plusieurs niveaux de gravité (info, success, warning, error) et peut porter une action principale et une action secondaire. Les boutons disent tout : une boîte a toujours exactement une sortie, et lorsqu'aucune action déclarée ne ferme, l'utilisateur doit trancher — un tap maladroit hors du cadre ne peut pas escamoter la décision.</p>
+
+<p>Cas d'usage courants :</p>
+
+<ul><li>Message de succès après l'envoi d'un formulaire</li><li>Notification d'erreur</li><li>Alerte d'information</li><li>Boîte de dialogue de confirmation</li><li>Message de bienvenue</li></ul>
+
+<h2 id="fields-description">Description des champs</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Identifiant unique de la vue message</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Toujours <code class="ys-code">"Message"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">MessageContent</code></td><td>Oui</td><td>Objet de contenu du message</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Nomme la fenêtre — le bandeau au-dessus de la boîte</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>La première ligne de la boîte, sous le titre — un sous-titre</td></tr><tr><td><code class="ys-code">content.body</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Ce que le message dit. Obligatoire : un message sans corps n'a rien à dire</td></tr><tr><td><code class="ys-code">content.severity</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Gravité du message : <code class="ys-code">"info"</code>, <code class="ys-code">"success"</code>, <code class="ys-code">"warning"</code>, <code class="ys-code">"error"</code> (par défaut : <code class="ys-code">"info"</code>)</td></tr><tr><td><code class="ys-code">content.actions</code></td><td><code class="ys-code">MessageAction[]</code></td><td>Non</td><td>Les boutons, dans l'ordre. Deux au plus ; aucun est valide — le client dessine alors un unique bouton de fermeture, si bien qu'une boîte a toujours exactement une sortie</td></tr><tr><td><code class="ys-code">content.actions[].label</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Texte du bouton</td></tr><tr><td><code class="ys-code">content.actions[].go</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Chemin ou URL de la vue que ce bouton charge. Absent, et sans <code class="ys-code">back</code>, le bouton se contente de fermer</td></tr><tr><td><code class="ys-code">content.actions[].method</code></td><td><code class="ys-code">HttpMethod</code></td><td>Non</td><td>Avec <code class="ys-code">go</code> seulement (défaut : GET)</td></tr><tr><td><code class="ys-code">content.actions[].back</code></td><td><code class="ys-code">number | 'root'</code></td><td>Non</td><td>Recule d'autant d'écrans, sans rien charger — la cible est déjà dans la pile. <code class="ys-code">'root'</code> ramène à votre vue de base. Exclusif avec <code class="ys-code">go</code></td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Identifiant de processus pour les parcours en plusieurs étapes</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Métadonnées de la vue (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Méthodes</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Paramètres</th><th>Retour</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Texte d'introduction</td><td><code class="ys-code">this</code></td><td>Définit le texte d'introduction affiché avant le corps</td></tr><tr><td><code class="ys-code">setBody(body)</code></td><td><code class="ys-code">body</code> - Texte du corps du message</td><td><code class="ys-code">this</code></td><td>Définit le corps principal du message (requis si intro n'est pas fourni)</td></tr><tr><td><code class="ys-code">setSeverity(severity)</code></td><td><code class="ys-code">severity</code> - Niveau de gravité ('info', 'success', 'warning', 'error')</td><td><code class="ys-code">this</code></td><td>Définit le niveau de gravité du message</td></tr><tr><td><code class="ys-code">addAction(label, options?)</code></td><td><code class="ys-code">label</code> - Texte du bouton<br><code class="ys-code">options.go</code> - Chemin ou URL à charger<br><code class="ys-code">options.method</code> - Méthode HTTP, avec <code class="ys-code">go</code> seulement<br><code class="ys-code">options.back</code> - Nombre d'écrans à reculer, ou <code class="ys-code">'root'</code></td><td><code class="ys-code">this</code></td><td>Ajoute un bouton. Deux au plus. Sans <code class="ys-code">go</code> ni <code class="ys-code">back</code>, il se contente de fermer</td></tr><tr><td><code class="ys-code">clearActions()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Retire toutes les actions</td></tr><tr><td><code class="ys-code">setPrimaryAction(text, method?, confirmMessage?)</code></td><td>voir <code class="ys-code">addAction</code></td><td><code class="ys-code">this</code></td><td>Nom historique. <code class="ys-code">confirmMessage</code> portait la destination et devient <code class="ys-code">go</code></td></tr><tr><td><code class="ys-code">setSecondaryAction(text, method?, confirmMessage?)</code></td><td>voir <code class="ys-code">addAction</code></td><td><code class="ys-code">this</code></td><td>Nom historique : ajoute le second bouton</td></tr><tr><td><code class="ys-code">submitButton(text, method?, confirmMessage?)</code></td><td>voir <code class="ys-code">addAction</code></td><td><code class="ys-code">this</code></td><td>Nom historique de <code class="ys-code">addAction</code></td></tr><tr><td><code class="ys-code">clearSecondaryAction()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Ne garde que la première action</td></tr><tr><td><code class="ys-code">setMetadata(metadata)</code></td><td><code class="ys-code">metadata</code> - Objet de métadonnées</td><td><code class="ys-code">this</code></td><td>Définit des métadonnées personnalisées</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Sert la vue après validation (hérité de BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Retourne la représentation JSON (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - Clé d'état<br><code class="ys-code">value</code> - Valeur d'état</td><td><code class="ys-code">void</code></td><td>Définit l'état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - Clé d'état</td><td><code class="ys-code">unknown</code></td><td>Lit l'état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue suivante</td><td><code class="ys-code">this</code></td><td>Contrôle avant d'une séquence paginée, dessiné par le client — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue précédente</td><td><code class="ys-code">this</code></td><td>Contrôle arrière de la même séquence. Ce n'est PAS là que mène le geste de retour — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, ou un entier &lt;= 1</td><td><code class="ys-code">this</code></td><td>Comment cette vue entre dans la pile de navigation du client (défaut : <code class="ys-code">push</code>) — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - position, à partir de 1<br><code class="ys-code">total</code> - longueur de la séquence, si connue</td><td><code class="ys-code">this</code></td><td>Où cette vue se situe dans sa séquence ; le client dessine l'indicateur — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Identifiant du processus<br><code class="ys-code">context</code> - Contexte du processus</td><td><code class="ys-code">this</code></td><td>Définit le contexte de processus (hérité de BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">Exemples de code JavaScript</h2>
+
+<h3 id="a-notice">Un avis, sans rien à décider</h3>
+
+<p>Ne déclarez aucune action et le client dessine un unique bouton de fermeture. Une boîte a toujours exactement une sortie.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const message = YeriaUI
+    .createMessageView('saved', 'Données reçues')
+    .setSeverity('success')
+    .setBody('Vos réponses ont bien été enregistrées.');</code></pre>
+
+<h3 id="a-notice-with-a-way-on">Un avis, avec une suite</h3>
+
+<p><code class="ys-code">back</code> revient sur un écran déjà dans la pile, sans rien charger — il retrouve l'état où l'utilisateur l'avait laissé. Le second bouton ferme et le laisse où il est.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const message = YeriaUI
+    .createMessageView('saved', 'Données reçues')
+    .setSeverity('success')
+    .setBody('Vos réponses ont bien été enregistrées.')
+    .addAction('Retour à la liste', { back: 1 })
+    .addAction('Rester ici');</code></pre>
+
+<h3 id="a-decision">Une décision</h3>
+
+<p>Deux actions, chacune avec son issue. Aucune ne fermant, la boîte ne se referme pas sur un tap maladroit : il faut trancher.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const message = YeriaUI
+    .createMessageView('confirm-delete', 'Supprimer définitivement ?')
+    .setSeverity('warning')
+    .setBody('Cette action est irréversible.')
+    .addAction('Supprimer', { go: '/items/4718/delete', method: 'DELETE' })
+    .addAction('Annuler');</code></pre>
+
+<h3 id="ending-a-journey">Clore un parcours</h3>
+
+<p><code class="ys-code">'root'</code> ramène à la vue servie par votre URL de base, quel que soit le chemin parcouru — la seule position que vous connaissiez à coup sûr.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const message = YeriaUI
+    .createMessageView('order-placed', 'Commande confirmée')
+    .setSeverity('success')
+    .setBody('La commande 4718 a bien été enregistrée.')
+    .addAction('Retour à l\'accueil', { back: 'root' });</code></pre>
+
+<h2 id="complete-json-example">Exemple JSON complet</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "welcome-message",
+  "type": "Message",
+  "content": {
+    "title": "Welcome!",
+    "intro": "Thank you for joining us",
+    "body": "We're excited to have you on board. Get started by completing your profile.",
+    "severity": "info",
+    "actions": [
+      { "label": "Get Started", "go": "/profile", "method": "GET" },
+      { "label": "Maybe Later" }
+    ],
+    "meta": {
+      "campaign": "onboarding-2025"
+    }
+  },
+  "process": {
+    "processId": "onboarding",
+    "processName": "User Onboarding",
+    "currentStep": 1,
+    "totalSteps": 3,
+    "stepName": "Welcome"
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

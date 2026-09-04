@@ -42,7 +42,8 @@ def build_provider_error(
         raise InvalidParameterError("message", message, "must be a non-empty string")
 
     error: Dict[str, Any] = {
-        "status": status if isinstance(status, int) else 400,
+        # `bool` est un `int` : `True` serait parti comme statut 1.
+        "status": status if isinstance(status, int) and not isinstance(status, bool) else 400,
         "code": code,
         "message": message,
     }

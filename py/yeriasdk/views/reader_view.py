@@ -90,7 +90,6 @@ class ReaderView(BaseView):
 
         self.content = {
             "title": view_title,
-            "intro": "",
             "elements": [],
         }
 

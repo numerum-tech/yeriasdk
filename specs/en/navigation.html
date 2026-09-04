@@ -1,0 +1,97 @@
+<h2 id="description">Description</h2>
+
+<p>Every view you serve is a screen. <strong>Navigation is how you decide what those screens do to each other</strong>: which one the back gesture lands on, whether a result replaces the form that produced it, and how a reader leafs from page to page.</p>
+
+<p>The split of responsibility is deliberate:</p>
+
+<ul><li><strong>You own the journey.</strong> Only you know that a form has been consumed, that a step has been cleared, that a file is closed. To the client, a receipt is a view like any other.</li><li><strong>The client owns the platform conventions.</strong> A back gesture always leads somewhere, an overlay never becomes a screen, and the entry point of your service always stays reachable.</li></ul>
+
+<p>So the protocol carries your *intent*, and the client turns it into stack behaviour. You never manipulate a stack: you do not know its state, and two clients (mobile, web) do not have the same one.</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<p>All navigation lives under the <code class="ys-code">nav</code> key of the served view.</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">nav.next</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Next view of a paginated sequence. Absolute URL, or a path resolved against your service base URL</td></tr><tr><td><code class="ys-code">nav.prev</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Previous view of the same sequence</td></tr><tr><td><code class="ys-code">nav.entry</code></td><td><code class="ys-code">string</code></td><td>No</td><td>How this view enters the stack: <code class="ys-code">"push"</code> (default) or <code class="ys-code">"replace"</code></td></tr></tbody></table></div>
+
+<p>A bare token (<code class="ys-code">step-two</code>) is refused: on the wire it cannot be told apart from a relative path, and no client keeps a registry of view ids to resolve it against. Write <code class="ys-code">/step-two</code> — or the full URL.</p>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL or path of the next view</td><td><code class="ys-code">this</code></td><td>Declares the forward control of a paginated sequence</td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL or path of the previous view</td><td><code class="ys-code">this</code></td><td>Declares the backward control of the same sequence</td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, or an integer &lt;= 1</td><td><code class="ys-code">this</code></td><td>Declares how this view enters the client's navigation stack</td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - 1-based position<br><code class="ys-code">total</code> - sequence length, when known</td><td><code class="ys-code">this</code></td><td>Where this view sits in its sequence; the client draws the indicator — see <a href="/docs/navigation">Navigation</a></td></tr></tbody></table></div>
+
+<h2 id="how-a-view-enters-the-stack">How a view enters the stack</h2>
+
+<p><code class="ys-code">entry</code> answers one question: <strong>must the user be able to return to the screen that led here?</strong></p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Value</th><th>Effect</th></tr></thead><tbody><tr><td><code class="ys-code">push</code> (default)</td><td>The view stacks on top of the screen that led to it. Back returns to that screen.</td></tr><tr><td><code class="ys-code">replace</code> <em>or</em> <code class="ys-code">0</code></td><td>The view takes that screen's place. Back skips over it.</td></tr><tr><td><code class="ys-code">-1</code>, <code class="ys-code">-2</code>…</td><td>It takes the place of the screens below as well: <code class="ys-code">-n</code> clears <code class="ys-code">n+1</code>. Back leads to whatever was left underneath.</td></tr></tbody></table></div>
+
+<p><strong>A view returned in response to a form submission replaces that form</strong>, with nothing to declare. It is by far the common case — a receipt, a confirmation — and forgetting it produces a quiet defect: the user lands back on a form that has already done its work, and nobody notices during development.</p>
+
+<p><strong>The next step of a wizard must therefore declare <code class="ys-code">push</code>.</strong> A declared value always wins over this default. Forgetting it shows up immediately, on the first try: you can no longer walk back a step. Of the two possible omissions, this one gets caught; the other does not.</p>
+
+<p>Everywhere else — a view reached through an action, a link, a deep entry — the default stays <code class="ys-code">push</code>. Declare <code class="ys-code">replace</code> on whatever acknowledges a completed action outside a form.</p>
+
+<p>The number is counted <strong>from the current screen</strong>, in screens that are <em>yours</em> — never in absolute depth. The same view sits at different heights depending on the path taken (your catalogue, or a deep link), and you do not know which one the user took. If the top screen is at index <code class="ys-code">T</code>, the arriving view lands at <code class="ys-code">T + entry</code>.</p>
+
+<p><strong>The recoil always stops at your service's root</strong>, whatever the number. That is not a safety net: it is what makes a relative recoil safe at all, since one view can be served from several paths and never carry away more than exists. From the root alone, a recoil simply stacks.</p>
+
+<p>A value above <code class="ys-code">1</code> is refused: stacking is stacking, and nothing more would be said.</p>
+
+<p><code class="ys-code">entry</code> places a <strong>new</strong> view. To <em>return</em> to a screen already visited — without reloading it, keeping the state it was in — use <code class="ys-code">back</code>, carried by a <a href="/docs/messageview">MessageView</a> action.</p>
+
+<p>The client cannot tell "here is your receipt" from "here is step 2": it applies the default for the situation — replace after a submission, stack elsewhere — and stands aside the moment you declare a value.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>// Step 2 of a wizard: it comes from a submission, so it would replace
+// step 1. Declare `push` so the user can walk back up.
+const step2 = YeriaUI
+    .createFormView('signup-step-2', 'Your details')
+    .addTextField('city', 'City', true)
+    .submitButton('Continue')
+    .setEntry('push');</code></pre>
+
+<h2 id="paginated-sequences">Paginated sequences</h2>
+
+<p><code class="ys-code">next</code> and <code class="ys-code">prev</code> are <strong>siblings</strong>: the two arrows of a sequence, drawn by the client itself. You write two paths and get the same pagination on every screen, with no interface code of your own.</p>
+
+<p>They are never bound to the back gesture. Back undoes time; pagination moves sideways.</p>
+
+<p><code class="ys-code">setPage(current, total?)</code> states where the view sits, and the client draws the indicator between the two controls — <em>Page 2 / 4</em>. Send numbers, not a sentence: the client formats them in the reader's language. Leave <code class="ys-code">total</code> out when the sequence has no known end, and the client shows the position alone. It is purely informative — moving still goes through <code class="ys-code">setNext</code> / <code class="ys-code">setPrev</code>, and a view that declares no position simply gets no indicator.</p>
+
+<p>A page reached through those controls <strong>replaces</strong> the current one. Leafing through forty pages would otherwise stack forty screens and turn the back gesture into a tunnel. A page that declares <code class="ys-code">entry: "push"</code> still stacks, if you really want page-by-page back.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const page = YeriaUI
+    .createReaderView('report-p2', 'Annual report — page 2')
+    .addParagraph('…')
+    .setPrev('/reports/annual/1')
+    .setNext('/reports/annual/3')
+    .setPage(2, 3);</code></pre>
+
+<h2 id="what-the-client-guarantees">What the client guarantees</h2>
+
+<p>These rules are not yours to change; count on them.</p>
+
+<ul><li><strong>The root never moves.</strong> The view served by your service base URL sits at the bottom of the stack and never leaves it, so the entry point of your service stays reachable. A <code class="ys-code">replace</code> with nothing under it stacks instead.</li><li><strong>A back gesture always leads somewhere.</strong> Reaching the root and going back leaves the service. No screen traps the user.</li><li><strong>An overlay is not a screen.</strong> A <code class="ys-code">MessageView</code> is rendered as a dialog: it takes no stack entry and closing it navigates nowhere.</li><li><strong>A deep entry gets its root.</strong> A link opening one of your sub-views directly (<code class="ys-code">yeria://dl/v/{serviceId}?p=/orders/123</code>, or the same link carried by a notification) mounts your base view underneath before showing the requested one. Expect one extra request, for your root.</li><li><strong>Targets stay inside your service.</strong> <code class="ys-code">next</code>, <code class="ys-code">prev</code> and action targets are resolved against your service base URL; anything outside it is refused.</li></ul>
+
+<h2 id="not-honoured-today">Not honoured today</h2>
+
+<p><code class="ys-code">setProcess()</code> / <code class="ys-code">belongsToProcess()</code> — <code class="ys-code">processId</code>, <code class="ys-code">processName</code>, <code class="ys-code">currentStep</code>, <code class="ys-code">totalSteps</code>, <code class="ys-code">stepName</code>, <code class="ys-code">canGoBack</code>, <code class="ys-code">canSkip</code> — are carried on the wire and <strong>no client acts on them</strong>. No step indicator is displayed, and <code class="ys-code">canGoBack</code> does not change the back gesture.</p>
+
+<p>They are kept so existing provider code keeps working, and this section will be removed once they are either implemented or dropped. Do not build a multi-step journey on <code class="ys-code">canGoBack</code>: use <code class="ys-code">entry</code> and your own navigation targets.</p>
+
+<h2 id="python-sample-code">Python Sample Code</h2>
+
+<pre class="ys-codeblock" data-lang="python"><code>from yeriasdk import YeriaUI
+
+receipt = (
+    YeriaUI.create_card_view('order-receipt', 'Order confirmed')
+    .set_description('Order 4718 has been recorded.')
+    .set_entry('replace')
+)
+
+page = (
+    YeriaUI.create_reader_view('report-p2', 'Annual report - page 2')
+    .add_paragraph('...')
+    .set_prev('/reports/annual/1')
+    .set_next('/reports/annual/3')
+)</code></pre>

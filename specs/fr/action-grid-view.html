@@ -1,0 +1,220 @@
+<h2 id="description">Description</h2>
+
+<p>Le composant <code class="ys-code">ActionGridView</code> affiche des actions sous forme de grille, idéal pour les tableaux de bord, les grilles de fonctionnalités ou la navigation par icônes. Il prend en charge un nombre de colonnes configurable (1 à 6) ainsi que l'espacement entre les éléments.</p>
+
+<p>Lorsqu'une action est sélectionnée, l'application mobile envoie en POST le code de l'action vers <code class="ys-code">{service.baseUrl}/{viewId}</code>, le code figurant dans le corps de la requête.</p>
+
+<h2 id="fields-description">Description des champs</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Identifiant unique de la vue grille d'actions</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Toujours <code class="ys-code">"ActionGrid"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">ActionGridContent</code></td><td>Oui</td><td>Objet de contenu de la grille d'actions</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Titre optionnel affiché au-dessus de la grille d'actions</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Texte d'introduction optionnel affiché avant la grille d'actions</td></tr><tr><td><code class="ys-code">content.actions</code></td><td><code class="ys-code">ActionConfig[]</code></td><td>Oui</td><td>Tableau des actions (au moins une action requise)</td></tr><tr><td><code class="ys-code">content.actions[].code</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Code d'action unique (utilisé lors de la soumission)</td></tr><tr><td><code class="ys-code">content.actions[].title</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Titre de l'action affiché à l'utilisateur</td></tr><tr><td><code class="ys-code">content.actions[].desc</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Description ou sous-titre optionnel</td></tr><tr><td><code class="ys-code">content.actions[].thumbnail</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>URL optionnelle de l'image de vignette</td></tr><tr><td><code class="ys-code">content.actions[].disabled</code></td><td><code class="ys-code">boolean</code></td><td>Non</td><td>Indique si l'action est désactivée (valeur par défaut : false)</td></tr><tr><td><code class="ys-code">content.actions[].metadata</code></td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Non</td><td>Métadonnées optionnelles associées à l'action</td></tr><tr><td><code class="ys-code">content.columns</code></td><td><code class="ys-code">number</code></td><td>Non</td><td>Nombre de colonnes (1 à 6, valeur par défaut : 2)</td></tr><tr><td><code class="ys-code">content.spacing</code></td><td><code class="ys-code">number</code></td><td>Non</td><td>Espacement entre les éléments, en pixels (valeur par défaut : 16)</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Identifiant de processus pour les parcours en plusieurs étapes</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Métadonnées de la vue (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Méthodes</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Paramètres</th><th>Retour</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setTitle(title)</code></td><td><code class="ys-code">title</code> - Texte du titre</td><td><code class="ys-code">this</code></td><td>Définit le titre affiché au-dessus de la grille d'actions</td></tr><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Texte d'introduction</td><td><code class="ys-code">this</code></td><td>Définit le texte d'introduction affiché avant la grille d'actions</td></tr><tr><td><code class="ys-code">setColumns(columns)</code></td><td><code class="ys-code">columns</code> - Nombre de colonnes (1 à 6)</td><td><code class="ys-code">this</code></td><td>Définit le nombre de colonnes de la grille</td></tr><tr><td><code class="ys-code">setSpacing(spacing)</code></td><td><code class="ys-code">spacing</code> - Espacement en pixels (&gt;= 0)</td><td><code class="ys-code">this</code></td><td>Définit l'espacement entre les éléments de la grille</td></tr><tr><td><code class="ys-code">getColumns()</code></td><td>-</td><td><code class="ys-code">number</code></td><td>Retourne le nombre de colonnes courant</td></tr><tr><td><code class="ys-code">getSpacing()</code></td><td>-</td><td><code class="ys-code">number</code></td><td>Retourne la valeur d'espacement courante</td></tr><tr><td><code class="ys-code">addAction(code, title, description?, thumbnail?, disabled?, metadata?)</code></td><td><code class="ys-code">code</code> - Code de l'action<br><code class="ys-code">title</code> - Titre de l'action<br><code class="ys-code">description</code> - Description optionnelle<br><code class="ys-code">thumbnail</code> - URL d'image optionnelle<br><code class="ys-code">disabled</code> - Indicateur de désactivation<br><code class="ys-code">metadata</code> - Métadonnées optionnelles</td><td><code class="ys-code">this</code></td><td>Ajoute une action à la grille</td></tr><tr><td><code class="ys-code">addActions(actions)</code></td><td><code class="ys-code">actions</code> - Tableau d'objets action</td><td><code class="ys-code">this</code></td><td>Ajoute plusieurs actions en une seule fois</td></tr><tr><td><code class="ys-code">removeAction(actionCode)</code></td><td><code class="ys-code">actionCode</code> - Code de l'action à supprimer</td><td><code class="ys-code">boolean</code></td><td>Supprime une action à partir de son code</td></tr><tr><td><code class="ys-code">updateAction(actionCode, updates)</code></td><td><code class="ys-code">actionCode</code> - Code de l'action<br><code class="ys-code">updates</code> - Modifications partielles de l'action</td><td><code class="ys-code">boolean</code></td><td>Met à jour une action existante</td></tr><tr><td><code class="ys-code">getAction(actionCode)</code></td><td><code class="ys-code">actionCode</code> - Code de l'action</td><td><code class="ys-code">ActionConfig | undefined</code></td><td>Retourne une action à partir de son code (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">getActions()</code></td><td>-</td><td><code class="ys-code">ActionConfig[]</code></td><td>Retourne toutes les actions (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">getActiveActions()</code></td><td>-</td><td><code class="ys-code">ActionConfig[]</code></td><td>Retourne uniquement les actions actives, c'est-à-dire non désactivées (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">getActionCount()</code></td><td>-</td><td><code class="ys-code">number</code></td><td>Retourne le nombre d'actions (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">hasAction(actionCode)</code></td><td><code class="ys-code">actionCode</code> - Code de l'action</td><td><code class="ys-code">boolean</code></td><td>Vérifie l'existence d'une action (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">hasActions()</code></td><td>-</td><td><code class="ys-code">boolean</code></td><td>Vérifie si la grille contient au moins une action</td></tr><tr><td><code class="ys-code">filterActions(predicate)</code></td><td><code class="ys-code">predicate</code> - Fonction de filtrage</td><td><code class="ys-code">ActionConfig[]</code></td><td>Filtre les actions selon un prédicat (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">sortActions(compareFn)</code></td><td><code class="ys-code">compareFn</code> - Fonction de comparaison</td><td><code class="ys-code">this</code></td><td>Trie les actions selon une fonction personnalisée (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">sortByTitle(ascending?)</code></td><td><code class="ys-code">ascending</code> - Ordre de tri (valeur par défaut : true)</td><td><code class="ys-code">this</code></td><td>Trie les actions par ordre alphabétique de titre (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">disableAllActions()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Désactive toutes les actions (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">enableAllActions()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Active toutes les actions (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">clearActions()</code></td><td>-</td><td><code class="ys-code">void</code></td><td>Supprime toutes les actions (hérité de BaseActionView)</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Sert la vue après validation (hérité de BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Retourne la représentation JSON (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - Clé d'état<br><code class="ys-code">value</code> - Valeur d'état</td><td><code class="ys-code">void</code></td><td>Définit l'état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - Clé d'état</td><td><code class="ys-code">unknown</code></td><td>Retourne l'état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue suivante</td><td><code class="ys-code">this</code></td><td>Contrôle avant d'une séquence paginée, dessiné par le client — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue précédente</td><td><code class="ys-code">this</code></td><td>Contrôle arrière de la même séquence. Ce n'est PAS là que mène le geste de retour — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, ou un entier &lt;= 1</td><td><code class="ys-code">this</code></td><td>Comment cette vue entre dans la pile de navigation du client (défaut : <code class="ys-code">push</code>) — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - position, à partir de 1<br><code class="ys-code">total</code> - longueur de la séquence, si connue</td><td><code class="ys-code">this</code></td><td>Où cette vue se situe dans sa séquence ; le client dessine l'indicateur — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Identifiant du processus<br><code class="ys-code">context</code> - Contexte du processus</td><td><code class="ys-code">this</code></td><td>Définit le contexte de processus (hérité de BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">Exemples de code JavaScript</h2>
+
+<h3 id="basic-action-grid">Grille d'actions simple</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const actionGrid = yeriaApp
+    .createActionGridView('dashboard', 'Dashboard')
+    .setIntro('Choose an action from the grid below')
+    .setColumns(2)
+    .addAction('analytics', 'Analytics', 'View your statistics', 'analytics.png')
+    .addAction('reports', 'Reports', 'Generate PDF reports', 'reports.png')
+    .addAction('users', 'Users', 'Manage access', 'users.png')
+    .addAction('payments', 'Payments', 'Track payments', 'payments.png');
+
+const response = yeriaApp.serve(actionGrid);</code></pre>
+
+<h3 id="action-grid-with-custom-columns">Grille d'actions avec colonnes personnalisées</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionGrid = yeriaApp
+    .createActionGridView('features', 'Features')
+    .setColumns(3)  // 3 columns
+    .setSpacing(24)  // 24px spacing
+    .addAction('feature-1', 'Feature 1', 'Description 1', 'feature1.png')
+    .addAction('feature-2', 'Feature 2', 'Description 2', 'feature2.png')
+    .addAction('feature-3', 'Feature 3', 'Description 3', 'feature3.png')
+    .addAction('feature-4', 'Feature 4', 'Description 4', 'feature4.png')
+    .addAction('feature-5', 'Feature 5', 'Description 5', 'feature5.png')
+    .addAction('feature-6', 'Feature 6', 'Description 6', 'feature6.png');</code></pre>
+
+<h3 id="single-column-grid">Grille à une seule colonne</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionGrid = yeriaApp
+    .createActionGridView('menu', 'Menu')
+    .setColumns(1)  // Single column (vertical list)
+    .addAction('item-1', 'Item 1', 'Description 1')
+    .addAction('item-2', 'Item 2', 'Description 2')
+    .addAction('item-3', 'Item 3', 'Description 3');</code></pre>
+
+<h3 id="action-grid-with-metadata">Grille d'actions avec métadonnées</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionGrid = yeriaApp
+    .createActionGridView('services', 'Services')
+    .setColumns(2)
+    .addAction(
+        'service-1',
+        'Service 1',
+        'Premium service',
+        'service1.png',
+        false,
+        { badge: 'Popular', price: '$99' }
+    )
+    .addAction(
+        'service-2',
+        'Service 2',
+        'Basic service',
+        'service2.png',
+        false,
+        { price: '$49' }
+    );</code></pre>
+
+<h3 id="action-grid-with-disabled-actions">Grille d'actions comportant des actions désactivées</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionGrid = yeriaApp
+    .createActionGridView('features', 'Features')
+    .setColumns(2)
+    .addAction('feature-1', 'Feature 1', 'Available', 'feature1.png')
+    .addAction('feature-2', 'Feature 2', 'Coming soon', 'feature2.png', true)
+    .addAction('feature-3', 'Feature 3', 'Available', 'feature3.png')
+    .addAction('feature-4', 'Feature 4', 'Coming soon', 'feature4.png', true);</code></pre>
+
+<h3 id="dynamic-action-grid-management">Gestion dynamique de la grille d'actions</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionGrid = yeriaApp
+    .createActionGridView('dashboard', 'Dashboard')
+    .setColumns(2)
+    .addAction('item-1', 'Item 1', 'Description 1')
+    .addAction('item-2', 'Item 2', 'Description 2')
+    .addAction('item-3', 'Item 3', 'Description 3');
+
+// Get current columns
+const columns = actionGrid.getColumns();  // Returns 2
+
+// Get current spacing
+const spacing = actionGrid.getSpacing();  // Returns 16
+
+// Update an action
+actionGrid.updateAction('item-2', {
+    title: 'Updated Item 2',
+    desc: 'Updated description',
+    disabled: true
+});
+
+// Remove an action
+actionGrid.removeAction('item-3');
+
+// Check if has actions
+const hasActions = actionGrid.hasActions();  // Returns true</code></pre>
+
+<h3 id="action-grid-with-multiple-actions">Grille d'actions avec ajout groupé</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionGrid = yeriaApp
+    .createActionGridView('services', 'Our Services')
+    .setColumns(3)
+    .addActions([
+        {
+            code: 'service-1',
+            title: 'Service 1',
+            description: 'Description 1',
+            thumbnail: 'service1.png'
+        },
+        {
+            code: 'service-2',
+            title: 'Service 2',
+            description: 'Description 2',
+            thumbnail: 'service2.png'
+        },
+        {
+            code: 'service-3',
+            title: 'Service 3',
+            description: 'Description 3',
+            thumbnail: 'service3.png'
+        },
+        {
+            code: 'service-4',
+            title: 'Service 4',
+            description: 'Description 4',
+            thumbnail: 'service4.png'
+        }
+    ]);</code></pre>
+
+<h3 id="action-grid-in-process-workflow">Grille d'actions dans un processus</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionGrid = yeriaApp
+    .createActionGridView('onboarding-options', 'Get Started')
+    .setProcess('onboarding', {
+        processName: 'User Onboarding',
+        currentStep: 1,
+        totalSteps: 3
+    })
+    .setColumns(2)
+    .addAction('quick-start', 'Quick Start', 'Get started quickly')
+    .addAction('guided-tour', 'Guided Tour', 'Take a guided tour')
+    .addAction('custom-setup', 'Custom Setup', 'Customize your setup')
+    .addAction('skip', 'Skip', 'Skip for now');</code></pre>
+
+<h2 id="complete-json-example">Exemple JSON complet</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "dashboard",
+  "type": "ActionGrid",
+  "content": {
+    "title": "Dashboard",
+    "intro": "Choose an action to get started",
+    "actions": [
+      {
+        "code": "analytics",
+        "title": "Analytics",
+        "desc": "View your statistics",
+        "thumbnail": "https://example.com/icons/analytics.png",
+        "disabled": false,
+        "metadata": {
+          "category": "reports"
+        }
+      },
+      {
+        "code": "reports",
+        "title": "Reports",
+        "desc": "Generate PDF reports",
+        "thumbnail": "https://example.com/icons/reports.png",
+        "disabled": false,
+        "metadata": {
+          "category": "reports"
+        }
+      },
+      {
+        "code": "users",
+        "title": "Users",
+        "desc": "Manage access",
+        "thumbnail": "https://example.com/icons/users.png",
+        "disabled": false,
+        "metadata": {
+          "category": "management"
+        }
+      },
+      {
+        "code": "payments",
+        "title": "Payments",
+        "desc": "Track payments",
+        "thumbnail": "https://example.com/icons/payments.png",
+        "disabled": true,
+        "metadata": {
+          "category": "finance"
+        }
+      }
+    ],
+    "columns": 2,
+    "spacing": 16
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

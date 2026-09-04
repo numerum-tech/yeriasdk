@@ -45,7 +45,6 @@ class ActionGridView(BaseActionView):
 
         self.content = {
             "title": title,
-            "intro": "",
             "actions": self._actions,  # Reference to actions from BaseActionView
             "columns": 2,
             "spacing": 16,

@@ -4,17 +4,50 @@ import {
     ValidationResult,
     ViewState,
     NavigationConfig,
+    NavigationEntry,
     ProcessContext,
     createValidationError
 } from '../types';
 import { ViewValidationError, NoProcessContextError, InvalidParameterError } from '../errors';
+
+/**
+ * Walks a payload part and returns the path of the first non-finite number,
+ * or null. `NaN` and `±Infinity` have no JSON form: `JSON.stringify` writes
+ * `null`, Python's `json.dumps` writes `NaN`, and a signed payload carrying
+ * either is one no client can read back. The builders refuse them where they
+ * know the field; this is the net under all of them, at the one point every
+ * payload goes through.
+ */
+function findNonFiniteNumber(value: unknown, path: string): string | null {
+    // `JSON.stringify` asks a value for its `toJSON()` first; so does this
+    // walk, so what is checked is what gets serialised (a Date becomes its
+    // ISO string here, a custom object whatever it chooses to yield).
+    if (value && typeof value === 'object' && typeof (value as { toJSON?: unknown }).toJSON === 'function') {
+        value = (value as { toJSON: () => unknown }).toJSON();
+    }
+    if (typeof value === 'number') return Number.isFinite(value) ? null : path;
+    if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+            const hit = findNonFiniteNumber(value[i], `${path}[${i}]`);
+            if (hit) return hit;
+        }
+        return null;
+    }
+    if (value && typeof value === 'object') {
+        for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+            const hit = findNonFiniteNumber(v, path ? `${path}.${k}` : k);
+            if (hit) return hit;
+        }
+    }
+    return null;
+}
 import { validateNavigationTarget, DEFAULT_URL_CONFIG } from '../utils/validators';
 
 /**
  * Abstract base for every Yeria SGUI view (Form, Reader, Card, Map, ...).
  *
  * Holds the state common to all views: identity (id / type / processId),
- * navigation (setNext / setPrev), metadata, and the serialization
+ * navigation (setNext / setPrev / setEntry / setPage), metadata, and the serialization
  * (build / toJSON) that produces the view's JSON description. Concrete views
  * are created via the YeriaApp / YeriaUI factory methods, populated, then
  * signed by their serialized output. Instances are mutable, per-request
@@ -73,10 +106,14 @@ export abstract class BaseView {
                 ) {
                     errors.push(createValidationError('Form must have at least one field'));
                 } else {
-                    // Exclude separator fields from "at least one field" validation
+                    // A form made only of rules and blank space is not a form.
+                    // `paragraph` is deliberately NOT excluded here: it at least
+                    // says something, and excluding it would refuse forms that
+                    // providers serve today.
                     const fields = (this.content as Record<string, unknown>)['fields'] as Array<Record<string, unknown>>;
-                    const nonSeparatorFields = fields.filter((f : any) => f.fieldType !== 'separator');
-                    if (nonSeparatorFields.length === 0) {
+                    const blankTypes = ['separator', 'spacer'];
+                    const realFields = fields.filter((f: any) => !blankTypes.includes(f.fieldType));
+                    if (realFields.length === 0) {
                         errors.push(createValidationError('Form must have at least one non-separator field'));
                     }
                 }
@@ -114,22 +151,24 @@ export abstract class BaseView {
 
             case 'Message':
                 if (typeof this.content === 'object' && this.content !== null) {
-                    const messageContent = this.content as {
-                        body?: string;
-                        intro?: string;
-                        confirm?: unknown;
-                    };
+                    const messageContent = this.content as { body?: string };
 
-                    const hasBody = typeof messageContent.body === 'string' && messageContent.body.trim().length > 0;
-                    const hasIntro = typeof messageContent.intro === 'string' && messageContent.intro.trim().length > 0;
-
-                    if (!hasBody && !hasIntro) {
-                        errors.push(createValidationError('Message view must define a body or an intro'));
+                    // Les trois textes ont des rôles distincts : `title` nomme
+                    // la fenêtre, `intro` est la première ligne — un
+                    // sous-titre — et `body` est ce que le message DIT. Un
+                    // message sans corps n'a rien à dire, d'où l'exigence ;
+                    // l'intro, elle, reste facultative.
+                    const hasBody = typeof messageContent.body === 'string'
+                        && messageContent.body.trim().length > 0;
+                    if (!hasBody) {
+                        errors.push(createValidationError('Message view must define a body'));
                     }
 
-                    if (!messageContent.confirm) {
-                        errors.push(createValidationError('Message view must define a primary action'));
-                    }
+                    // Aucune action n'est exigée : une boîte sans bouton déclaré
+                    // se ferme par un « OK » que le client dessine, comme une
+                    // MsgBox sans jeu de boutons. Exiger une action principale
+                    // obligeait le fournisseur à nommer un bouton dont il ne
+                    // voulait pas.
                 } else {
                     errors.push(createValidationError('Message view content is invalid'));
                 }
@@ -285,9 +324,35 @@ export abstract class BaseView {
             result['state'] = this.state;
         }
 
-        // Add the navigation if present
+        // Add the navigation if present.
+        //
+        // Rebuilt key by key rather than passed through: a JS object keeps its
+        // INSERTION order, so `setPrev().setNext()` and `setNext().setPrev()`
+        // would serialize differently — and differently again from the Python
+        // SDK, which writes a fixed order. Same calls, same bytes, in either
+        // language.
         if (this.navigation) {
-            result['nav'] = this.navigation;
+            const nav: Record<string, unknown> = {};
+            if (this.navigation.next !== undefined) nav['next'] = this.navigation.next;
+            if (this.navigation.prev !== undefined) nav['prev'] = this.navigation.prev;
+            if (this.navigation.entry !== undefined) nav['entry'] = this.navigation.entry;
+            if (this.navigation.page !== undefined) {
+                // Même raison que ci-dessus : `total` est omis quand il n'est
+                // pas connu, jamais émis à null.
+                const page: Record<string, number> = { current: this.navigation.page.current };
+                if (this.navigation.page.total !== undefined) page['total'] = this.navigation.page.total;
+                nav['page'] = page;
+            }
+            result['nav'] = nav;
+        }
+
+        // The ASSEMBLED payload is what gets walked, as Python walks its own:
+        // checking `content` alone left `state` out, and `setState` takes an
+        // `unknown` — a `NaN` there serialised as `null` on one side and was
+        // refused on the other.
+        const nonFinite = findNonFiniteNumber(result, '');
+        if (nonFinite) {
+            throw new ViewValidationError(this.id, this.type, [`payload contains a non-finite number at ${nonFinite}`]);
         }
 
         return result;
@@ -474,6 +539,34 @@ export abstract class BaseView {
         return this;
     }
 
+    /**
+     * A sequence target must be addressable: an absolute URL, or a path the
+     * client can resolve against the service base.
+     *
+     * A bare token (`step-two`) is refused here. On the wire it is
+     * indistinguishable from a relative path, so the validator accepts it —
+     * but the client has no registry of view ids to resolve it against, and a
+     * provider writing one would get a silent 404 instead of an error. Better
+     * to fail at write time.
+     */
+    protected assertAddressableTarget(fieldName: string, target: string): string {
+        const trimmed = this.assertNavigationTarget(fieldName, target, {
+            allowRelative: true,
+            allowViewId: false
+        });
+
+        const addressable = /^https?:\/\//i.test(trimmed) || trimmed.includes('/');
+        if (!addressable) {
+            throw new InvalidParameterError(
+                fieldName,
+                target,
+                'Navigation target must be a URL or a path (e.g. "/orders/page/2"), not a bare view id'
+            );
+        }
+
+        return trimmed;
+    }
+
     protected assertNavigationTarget(
         fieldName: string,
         target: string,
@@ -495,15 +588,19 @@ export abstract class BaseView {
     }
 
     /**
-     * Sets the next-view navigation target (validated to block open redirects).
-     * Sets the next view (navigation)
-     * Validates URL to prevent open redirects and malicious links
+     * Next view of a paginated sequence — the client draws the forward control.
+     *
+     * A sibling, not a destination for the back gesture. Moving to it REPLACES
+     * the current view unless the view reached declares `entry: 'push'`:
+     * without that, leafing through forty pages stacks forty screens and back
+     * becomes a tunnel.
+     *
+     * A bare view id is refused: the client has no registry to resolve one
+     * against. Pass a path relative to your service base, or an absolute URL
+     * inside it.
      */
     setNext(url: string): this {
-        const target = this.assertNavigationTarget('url', url, {
-            allowRelative: true,
-            allowViewId: true
-        });
+        const target = this.assertAddressableTarget('url', url);
 
         if (!this.navigation) {
             this.navigation = {};
@@ -513,20 +610,100 @@ export abstract class BaseView {
     }
 
     /**
-     * Sets the previous-view navigation target (validated to block open redirects).
-     * Sets the previous view (navigation)
-     * Validates URL to prevent open redirects and malicious links
+     * Previous view of a paginated sequence — the client draws the back control.
+     *
+     * Symmetric with {@link setNext}. This is NOT where the back gesture leads:
+     * the client always keeps the view served by your service base URL at the
+     * bottom of the stack, and back walks down to it.
+     *
+     * A bare view id is refused, as for {@link setNext}.
      */
     setPrev(url: string): this {
-        const target = this.assertNavigationTarget('url', url, {
-            allowRelative: true,
-            allowViewId: true
-        });
+        const target = this.assertAddressableTarget('url', url);
 
         if (!this.navigation) {
             this.navigation = {};
         }
         this.navigation.prev = target;
+        return this;
+    }
+
+    /**
+     * How this view enters the client's navigation stack.
+     *
+     *   'push'    (default) — stacks on top of the screen that led here; back
+     *                         returns to it.
+     *   'replace'           — takes that screen's place; back skips over it.
+     *
+     * Declare `replace` on what acknowledges a completed action — the receipt
+     * of a submitted form, the confirmation of a purchase — so the user cannot
+     * walk back onto a screen that has already done its work.
+     *
+     * Do NOT declare it on the next step of a wizard: step 2 replacing step 1
+     * would make the assistant impossible to walk back up. The client cannot
+     * tell those two apart, which is why the default stays 'push'.
+     *
+     * The view served by your service base URL is the root of the journey; it
+     * is never replaced, so a client showing only that root stacks instead.
+     */
+    setEntry(entry: NavigationEntry): this {
+        if (typeof entry === 'number') {
+            // Au-dessus de 1, rien de plus ne se dirait : empiler est empiler.
+            // Refusé plutôt qu'accepté en silence, pour qu'un `entry: 7` ne
+            // donne pas l'illusion de vouloir dire quelque chose.
+            if (!Number.isInteger(entry) || entry > 1) {
+                throw new InvalidParameterError(
+                    'entry',
+                    entry,
+                    'entry must be an integer <= 1 (1 = push, 0 = replace, -n = deeper recoil)'
+                );
+            }
+        } else if (entry !== 'push' && entry !== 'replace') {
+            throw new InvalidParameterError(
+                'entry',
+                entry,
+                "entry must be 'push', 'replace', or an integer <= 1"
+            );
+        }
+
+        if (!this.navigation) {
+            this.navigation = {};
+        }
+        this.navigation.entry = entry;
+        return this;
+    }
+
+    /**
+     * States where this view sits in its sequence, so the client can draw a
+     * position indicator alongside the `next` / `prev` controls.
+     *
+     * Numbers, not a sentence: the client formats them in the reader's
+     * language. Omit `total` when the sequence has no known end — the client
+     * then shows the current position alone.
+     *
+     * Purely informative. It drives no navigation: moving still goes through
+     * {@link setNext} / {@link setPrev}.
+     *
+     * @param current - 1-based position of this view
+     * @param total - length of the sequence, when known
+     */
+    setPage(current: number, total?: number): this {
+        if (!Number.isInteger(current) || current < 1) {
+            throw new InvalidParameterError('current', current, 'current must be an integer >= 1');
+        }
+        if (total !== undefined) {
+            if (!Number.isInteger(total) || total < 1) {
+                throw new InvalidParameterError('total', total, 'total must be an integer >= 1');
+            }
+            if (total < current) {
+                throw new InvalidParameterError('total', total, 'total cannot be smaller than current');
+            }
+        }
+
+        if (!this.navigation) {
+            this.navigation = {};
+        }
+        this.navigation.page = total === undefined ? { current } : { current, total };
         return this;
     }
 

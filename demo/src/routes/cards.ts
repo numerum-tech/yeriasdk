@@ -16,12 +16,14 @@ const yeriaApp = new YeriaApp({
 router.get('/', (req: Request, res: Response) => {
   const card = YeriaUI
     .createCardView('comprehensive-card', 'CardView')
-    .setSubtitle('Démonstration de toutes les fonctionnalités CardView')
+    .setIntro('Démonstration de toutes les fonctionnalités CardView')
     .setDescription('Cette carte présente toutes les fonctionnalités disponibles du composant CardView : image, badge, statistiques, sections, actions avec variantes et métadonnées personnalisées.')
     .setImage('img/card-product.png', 'Image de démonstration du produit')
     .setBadge('Premium')
 
-    // Statistiques
+    // Statistiques — l'intitule du bloc vient desormais du fournisseur : le
+    // renderer n'en invente plus.
+    .setStatsHeading('Statistiques')
     .addStat('Note', '⭐⭐⭐⭐⭐ 4.8/5')
     .addStat('Prix', '850 499 FCFA')
     .addStat('Stock', '✅ En stock')

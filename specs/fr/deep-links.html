@@ -1,0 +1,59 @@
+<h2 id="description">Description</h2>
+
+<p>Un lien profond ouvre votre service — ou l'un de ses écrans précis — depuis l'extérieur de l'application : une notification, un courriel, un QR code, un message.</p>
+
+<p><strong>Le lien désigne votre service, jamais votre serveur.</strong> Il porte l'identifiant que Yeria a donné à votre service, et le client résout le reste : votre URL de base, vos clés publiques, la règle de pays. C'est ce qui permet à vos liens de continuer à fonctionner quand votre infrastructure bouge, et ce qui empêche un lien forgé de pointer l'application vers un serveur qui n'est pas le vôtre.</p>
+
+<h2 id="the-two-forms">Les deux formes</h2>
+
+<p>Les deux disent la même chose. Prenez celle que le support permet.</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Forme</th><th>Usage</th></tr></thead><tbody><tr><td><code class="ys-code">yeria://dl/{op}/{serviceId}</code></td><td>Dans une notification, un QR code, une application qui sait déjà que Yeria est installé.</td></tr><tr><td><code class="ys-code">https://yeria.app/dl/{op}/{serviceId}</code></td><td>Partout où l'on attend un lien web — un courriel, une page, un SMS. Il ouvre l'application quand elle est installée.</td></tr></tbody></table></div>
+
+<h2 id="operations">Opérations</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th><code class="ys-code">op</code></th><th>Ouvre</th></tr></thead><tbody><tr><td><code class="ys-code">s</code></td><td>Votre service, à son URL de base — sa vue racine.</td></tr><tr><td><code class="ys-code">v</code></td><td>L'une de vos vues. Exige <code class="ys-code">?p=</code>, voir plus bas.</td></tr><tr><td><code class="ys-code">c</code></td><td>La conversation entre l'utilisateur et votre service.</td></tr><tr><td><code class="ys-code">p</code></td><td>La proposition d'épingler votre service.</td></tr><tr><td><code class="ys-code">n</code></td><td>La demande de consentement à vos notifications. C'est le lien à mettre derrière un appel à l'action « être notifié ».</td></tr></tbody></table></div>
+
+<h2 id="linking-to-one-of-your-views">Pointer vers l'une de vos vues</h2>
+
+<p><code class="ys-code">v</code> prend le chemin de la vue sur votre propre serveur, dans un unique paramètre <code class="ys-code">p</code> :</p>
+
+<pre class="ys-codeblock" data-lang="text"><code>yeria://dl/v/{serviceId}?p=/orders/4718
+https://yeria.app/dl/v/{serviceId}?p=/orders/4718</code></pre>
+
+<p><strong>Une entrée profonde reçoit sa racine.</strong> Le client monte d'abord la vue servie par votre URL de base, puis pose la vue demandée par-dessus. L'utilisateur arrive donc là où vous l'avez envoyé, et un geste de retour le mène dans votre service au lieu de le faire sortir de l'application. Vous n'avez rien à déclarer pour cela : c'est ainsi que le client entre, toujours.</p>
+
+<h2 id="build-them-with-the-sdk">Les construire avec le SDK</h2>
+
+<p><code class="ys-code">YeriaLink</code> écrit ces liens pour vous, et refuse d'en écrire un qui soit cassé. Un identifiant de service hors du jeu accepté, ou un chemin qui sortirait de votre service, lève à l'endroit où vous le construisez — plutôt que de produire une chaîne qui, sur le téléphone de quelqu'un, n'ouvrira rien sans rien dire.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaLink } from '@numerum-tech/yeriasdk';
+
+YeriaLink.service('svc_4718');                       // votre service
+YeriaLink.component('svc_4718', '/orders/4718');     // l'une de vos vues
+YeriaLink.chat('svc_4718');                          // la conversation
+YeriaLink.pin('svc_4718');                           // la proposition d'épinglage
+YeriaLink.subscribe('svc_4718');                     // le consentement aux notifications
+
+// https://yeria.app/dl/s/svc_4718</code></pre>
+
+<p>HTTPS est la forme par défaut, parce qu'elle fonctionne sur une page web comme sur un appareil où Yeria est installé. Demandez le schéma propre à Yeria là où vous savez déjà qu'il l'est :</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>YeriaLink.service('svc_4718', { format: 'yeria' });
+// yeria://dl/s/svc_4718</code></pre>
+
+<p><code class="ys-code">YeriaLink.isValid(lien)</code> répond si un lien est de ceux que Yeria honorera — utile quand un lien vous arrive d'un endroit que vous ne maîtrisez pas.</p>
+
+<p>Le SDK Python porte la même classe, avec les cinq mêmes constructeurs et la même validation.</p>
+
+<h2 id="what-the-client-refuses">Ce que le client refuse</h2>
+
+<p>Un lien venu de l'extérieur est une entrée non fiable. Le client écarte en silence tout ce dont il ne peut pas répondre — un lien refusé n'ouvre rien, plutôt que d'ouvrir la mauvaise chose.</p>
+
+<ul><li>Un hôte autre que <code class="ys-code">dl</code>, ou un domaine autre que <code class="ys-code">yeria.app</code>. Rien d'autre n'est un lien Yeria.</li><li>Un identifiant de service hors de <code class="ys-code">A-Z a-z 0-9 . _ ~ -</code>, ou plus long que 128 caractères.</li><li>Tout paramètre autre que l'unique <code class="ys-code">p</code> d'un lien <code class="ys-code">v</code>, ou un fragment.</li><li>Un <code class="ys-code">p</code> qui n'est pas un chemin sur votre serveur : une URL absolue, une URL relative au protocole, une barre inversée, ou un segment <code class="ys-code">..</code>. Un lien peut atteindre l'intérieur de votre service ; il ne peut pas en sortir.</li><li>Un port, ou des identifiants dans l'URL.</li></ul>
+
+<h2 id="before-the-user-is-signed-in">Avant que l'utilisateur soit connecté</h2>
+
+<p>Un lien reçu alors que personne n'est connecté n'est pas perdu : il est gardé, et honoré dès que la session est ouverte. Votre appel à l'action fonctionne à la première installation comme au dixième lancement.</p>
+
+<p>Un service hors du pays de l'utilisateur demande confirmation avant de s'ouvrir. Si l'utilisateur refuse, rien ne s'ouvre — prévoyez le cas où votre lien ne mène pas où vous l'attendiez.</p>

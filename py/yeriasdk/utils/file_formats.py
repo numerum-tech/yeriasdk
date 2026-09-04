@@ -34,6 +34,10 @@ FILE_FORMATS: Dict[str, str] = {
     "ogg": "audio/ogg",
     "aac": "audio/aac",
     "wma": "audio/x-ms-wma",
+    # AAC in an MPEG-4 container — what iOS records by default
+    "m4a": "audio/mp4",
+    # what Android's recorder emits in an ogg/webm container
+    "opus": "audio/opus",
     # Video
     "mp4": "video/mp4",
     "avi": "video/x-msvideo",
@@ -41,6 +45,8 @@ FILE_FORMATS: Dict[str, str] = {
     "wmv": "video/x-ms-wmv",
     "flv": "video/x-flv",
     "webm": "video/webm",
+    # low-bitrate capture container still emitted by some Android devices
+    "3gp": "video/3gpp",
     # Archives
     "zip": "application/zip",
     "rar": "application/vnd.rar",
@@ -151,8 +157,8 @@ class FileFormatManager:
                 "rtf",
             ],
             "images": ["png", "jpeg", "jpg", "gif", "webp", "svg", "bmp", "tiff", "ico"],
-            "audio": ["mp3", "wav", "ogg", "aac", "wma"],
-            "video": ["mp4", "avi", "mov", "wmv", "flv", "webm"],
+            "audio": ["mp3", "wav", "ogg", "aac", "wma", "m4a", "opus"],
+            "video": ["mp4", "avi", "mov", "wmv", "flv", "webm", "3gp"],
             "archives": ["zip", "rar", "7z", "tar", "gz"],
             "code": ["json", "xml", "html", "css", "js", "ts", "py", "java", "cpp", "c"],
             "other": ["sql", "yaml", "yml", "md", "log"],

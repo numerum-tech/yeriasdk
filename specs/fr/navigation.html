@@ -1,0 +1,97 @@
+<h2 id="description">Description</h2>
+
+<p>Chaque vue que vous servez est un écran. <strong>La navigation, c'est la façon dont vous décidez de ce que ces écrans se font les uns aux autres</strong> : sur lequel le geste de retour atterrit, si un résultat remplace le formulaire qui l'a produit, et comment un lecteur feuillette d'une page à l'autre.</p>
+
+<p>Le partage des responsabilités est délibéré :</p>
+
+<ul><li><strong>Le parcours vous appartient.</strong> Vous seul savez qu'un formulaire est consommé, qu'une étape est franchie, qu'un dossier est clos. Pour le client, un reçu est une vue comme une autre.</li><li><strong>Les conventions de la plateforme appartiennent au client.</strong> Un geste de retour mène toujours quelque part, une vue en surimpression ne devient jamais un écran, et l'entrée de votre service reste toujours atteignable.</li></ul>
+
+<p>Le protocole porte donc votre *intention*, et le client la traduit en comportement de pile. Vous ne manipulez jamais une pile : vous n'en connaissez pas l'état, et deux clients (mobile, web) n'ont pas la même.</p>
+
+<h2 id="fields-description">Description des champs</h2>
+
+<p>Toute la navigation vit sous la clé <code class="ys-code">nav</code> de la vue servie.</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Champ</th><th>Type</th><th>Requis</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">nav.next</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Vue suivante d'une séquence paginée. URL absolue, ou chemin résolu contre l'URL de base de votre service</td></tr><tr><td><code class="ys-code">nav.prev</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Vue précédente de la même séquence</td></tr><tr><td><code class="ys-code">nav.entry</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Comment cette vue entre dans la pile : <code class="ys-code">"push"</code> (défaut) ou <code class="ys-code">"replace"</code></td></tr></tbody></table></div>
+
+<p>Un jeton nu (<code class="ys-code">step-two</code>) est refusé : sur le fil, rien ne le distingue d'un chemin relatif, et aucun client ne tient d'annuaire d'identifiants de vue pour le résoudre. Écrivez <code class="ys-code">/step-two</code> — ou l'URL complète.</p>
+
+<h2 id="methods">Méthodes</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Paramètres</th><th>Retour</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue suivante</td><td><code class="ys-code">this</code></td><td>Déclare le contrôle avant d'une séquence paginée</td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue précédente</td><td><code class="ys-code">this</code></td><td>Déclare le contrôle arrière de la même séquence</td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, ou un entier &lt;= 1</td><td><code class="ys-code">this</code></td><td>Déclare comment cette vue entre dans la pile de navigation du client</td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - position, à partir de 1<br><code class="ys-code">total</code> - longueur de la séquence, si connue</td><td><code class="ys-code">this</code></td><td>Où cette vue se situe dans sa séquence ; le client dessine l'indicateur — voir <a href="/docs/navigation">Navigation</a></td></tr></tbody></table></div>
+
+<h2 id="how-a-view-enters-the-stack">Comment une vue entre dans la pile</h2>
+
+<p><code class="ys-code">entry</code> répond à une seule question : <strong>l'utilisateur doit-il pouvoir revenir à l'écran qui l'a mené ici ?</strong></p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Valeur</th><th>Effet</th></tr></thead><tbody><tr><td><code class="ys-code">push</code> (défaut)</td><td>La vue s'empile sur l'écran qui y a mené. Le retour revient à cet écran.</td></tr><tr><td><code class="ys-code">replace</code> <em>ou</em> <code class="ys-code">0</code></td><td>La vue prend la place de cet écran. Le retour l'enjambe.</td></tr><tr><td><code class="ys-code">-1</code>, <code class="ys-code">-2</code>…</td><td>Elle prend aussi la place des écrans en dessous : <code class="ys-code">-n</code> en efface <code class="ys-code">n+1</code>. Le retour mène à ce qui restait dessous.</td></tr></tbody></table></div>
+
+<p><strong>Une vue rendue en réponse à une soumission de formulaire remplace ce formulaire</strong>, sans que vous ayez à le déclarer. C'est le cas de loin le plus fréquent — un reçu, une confirmation — et l'oublier produit un défaut discret : l'utilisateur retombe sur un formulaire qui a déjà fait son travail, et personne ne s'en aperçoit au développement.</p>
+
+<p><strong>L'étape suivante d'un assistant doit donc déclarer <code class="ys-code">push</code>.</strong> Une valeur déclarée l'emporte toujours sur ce défaut. L'oublier se voit immédiatement, dès le premier essai : on ne peut plus remonter d'une étape. Des deux oublis possibles, celui-ci se rattrape ; l'autre passe inaperçu.</p>
+
+<p>Partout ailleurs — une vue atteinte par une action, un lien, une entrée profonde — le défaut reste <code class="ys-code">push</code>. Déclarez <code class="ys-code">replace</code> sur ce qui acquitte une action accomplie hors formulaire.</p>
+
+<p>Le nombre se compte <strong>depuis l'écran courant</strong>, en écrans qui sont les <em>vôtres</em> — jamais en profondeur absolue. La même vue se trouve à des hauteurs différentes selon le chemin parcouru (votre catalogue, ou un lien profond), et vous ne savez pas lequel l'utilisateur a pris. Si le sommet porte l'index <code class="ys-code">T</code>, la vue qui arrive se pose à <code class="ys-code">T + entry</code>.</p>
+
+<p><strong>Le recul s'arrête toujours à la racine de votre service</strong>, quel que soit le nombre. Ce n'est pas un rattrapage : c'est ce qui rend un recul relatif sûr, puisqu'une même vue peut être servie depuis plusieurs chemins sans jamais emporter plus que ce qui existe. Depuis la racine seule, un recul empile simplement.</p>
+
+<p>Une valeur supérieure à <code class="ys-code">1</code> est refusée : empiler est empiler, et rien de plus ne se dirait.</p>
+
+<p><code class="ys-code">entry</code> place une vue <strong>nouvelle</strong>. Pour <em>revenir</em> sur un écran déjà visité — sans le recharger, et en retrouvant l'état où il était — c'est <code class="ys-code">back</code>, porté par l'action d'une <a href="/docs/messageview">MessageView</a>.</p>
+
+<p>Le client ne peut pas distinguer « voici votre reçu » de « voici l'étape 2 » : il applique le défaut de la situation — remplacer après une soumission, empiler ailleurs — et s'efface dès que vous déclarez une valeur.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>// L'étape 2 d'un assistant : elle vient d'une soumission, donc elle
+// remplacerait l'étape 1. On déclare `push` pour pouvoir y remonter.
+const step2 = YeriaUI
+    .createFormView('signup-step-2', 'Vos coordonnées')
+    .addTextField('city', 'Ville', true)
+    .submitButton('Continuer')
+    .setEntry('push');</code></pre>
+
+<h2 id="paginated-sequences">Séquences paginées</h2>
+
+<p><code class="ys-code">next</code> et <code class="ys-code">prev</code> sont des <strong>frères</strong> : les deux flèches d'une séquence, dessinées par le client lui-même. Vous écrivez deux chemins et obtenez la même pagination sur tous les écrans, sans code d'interface de votre côté.</p>
+
+<p>Ils ne sont jamais liés au geste de retour. Le retour défait le temps ; la pagination se déplace de côté.</p>
+
+<p><code class="ys-code">setPage(current, total?)</code> dit où se situe la vue, et le client dessine l'indicateur entre les deux contrôles — <em>Page 2 / 4</em>. Envoyez des nombres, pas une phrase : le client les met en forme dans la langue du lecteur. Omettez <code class="ys-code">total</code> quand la séquence n'a pas de fin connue, le client n'affiche alors que la position. C'est purement informatif — le déplacement passe toujours par <code class="ys-code">setNext</code> / <code class="ys-code">setPrev</code>, et une vue qui ne déclare aucune position n'obtient simplement pas d'indicateur.</p>
+
+<p>Une page atteinte par ces contrôles <strong>remplace</strong> la courante. Feuilleter quarante pages empilerait sinon quarante écrans et transformerait le geste de retour en tunnel. Une page qui déclare <code class="ys-code">entry: "push"</code> s'empile malgré tout, si vous tenez vraiment à un retour page à page.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const page = YeriaUI
+    .createReaderView('report-p2', 'Rapport annuel — page 2')
+    .addParagraph('…')
+    .setPrev('/reports/annual/1')
+    .setNext('/reports/annual/3')
+    .setPage(2, 3);</code></pre>
+
+<h2 id="what-the-client-guarantees">Ce que le client garantit</h2>
+
+<p>Ces règles ne sont pas les vôtres à changer ; comptez dessus.</p>
+
+<ul><li><strong>La racine ne bouge jamais.</strong> La vue servie par l'URL de base de votre service reste au fond de la pile et n'en sort pas, si bien que l'entrée de votre service demeure atteignable. Un <code class="ys-code">replace</code> sans rien dessous s'empile.</li><li><strong>Un geste de retour mène toujours quelque part.</strong> Depuis la racine, il quitte le service. Aucun écran ne piège l'utilisateur.</li><li><strong>Une surimpression n'est pas un écran.</strong> Une <code class="ys-code">MessageView</code> est rendue en boîte de dialogue : elle n'occupe aucune entrée de pile et sa fermeture ne navigue nulle part.</li><li><strong>Une entrée profonde reçoit sa racine.</strong> Un lien qui ouvre directement une de vos sous-vues (<code class="ys-code">yeria://dl/v/{serviceId}?p=/orders/123</code>, ou le même lien porté par une notification) monte votre vue de base en dessous avant d'afficher la vue demandée. Attendez-vous à une requête de plus, celle de votre racine.</li><li><strong>Les cibles restent dans votre service.</strong> <code class="ys-code">next</code>, <code class="ys-code">prev</code> et les cibles d'action sont résolus contre l'URL de base de votre service ; tout ce qui en sort est refusé.</li></ul>
+
+<h2 id="not-honoured-today">Non honoré aujourd'hui</h2>
+
+<p><code class="ys-code">setProcess()</code> / <code class="ys-code">belongsToProcess()</code> — <code class="ys-code">processId</code>, <code class="ys-code">processName</code>, <code class="ys-code">currentStep</code>, <code class="ys-code">totalSteps</code>, <code class="ys-code">stepName</code>, <code class="ys-code">canGoBack</code>, <code class="ys-code">canSkip</code> — voyagent sur le fil et <strong>aucun client n'en fait rien</strong>. Aucun fil d'étapes n'est affiché, et <code class="ys-code">canGoBack</code> ne change pas le geste de retour.</p>
+
+<p>Ces champs sont conservés pour que le code fournisseur existant continue de fonctionner, et cette section disparaîtra une fois qu'ils seront implémentés ou retirés. Ne bâtissez pas un parcours multi-étapes sur <code class="ys-code">canGoBack</code> : servez-vous d'<code class="ys-code">entry</code> et de vos propres cibles de navigation.</p>
+
+<h2 id="python-sample-code">Exemple de code Python</h2>
+
+<pre class="ys-codeblock" data-lang="python"><code>from yeriasdk import YeriaUI
+
+receipt = (
+    YeriaUI.create_card_view('order-receipt', 'Commande confirmée')
+    .set_description('La commande 4718 a bien été enregistrée.')
+    .set_entry('replace')
+)
+
+page = (
+    YeriaUI.create_reader_view('report-p2', 'Rapport annuel - page 2')
+    .add_paragraph('...')
+    .set_prev('/reports/annual/1')
+    .set_next('/reports/annual/3')
+)</code></pre>

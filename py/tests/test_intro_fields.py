@@ -4,11 +4,17 @@ Tests for intro field support across all views
 
 import pytest
 from yeriasdk import YeriaApp, YeriaAppConfig
+from yeriasdk.errors import InvalidParameterError
 from yeriasdk.views import (
     ActionListView,
     ActionGridView,
+    CardView,
+    CarouselView,
+    FormView,
+    IconGridView,
     MapView,
     ReaderView,
+    QRDisplayView,
     QRScanView,
     MessageView,
     TimelineView,
@@ -68,3 +74,76 @@ class TestIntroFields:
         assert view.content["intro"] == "Browse media"
 
 
+
+
+class TestHeaderTextContract:
+    """Un texte d'en-tete se pose ou n'existe pas.
+
+    Emettre `"intro": ""` faisait reserver au renderer mobile la bande d'une
+    ligne absente (mesure sur ReaderView : premier element a 135 px au lieu de
+    84 px). Les deux regles ci-dessous suppriment la cause a la source.
+    """
+
+    # (constructeur, nom du setter, cle de contenu)
+    SETTERS = [
+        (lambda: ActionListView("v", "T"), "set_intro", "intro"),
+        (lambda: ActionGridView("v", "T"), "set_intro", "intro"),
+        (lambda: MapView("v", "T"), "set_intro", "intro"),
+        (lambda: ReaderView("v", "T"), "set_intro", "intro"),
+        (lambda: QRScanView("v", "T"), "set_intro", "intro"),
+        (lambda: QRDisplayView("v", "T", "data"), "set_intro", "intro"),
+        (lambda: MessageView("v", "T"), "set_intro", "intro"),
+        (lambda: TimelineView("v", "T"), "set_intro", "intro"),
+        (lambda: MediaView("v", "T"), "set_intro", "intro"),
+        (lambda: IconGridView("v", "T"), "set_intro", "intro"),
+        (lambda: FormView("v", "T"), "set_intro", "intro"),
+        (lambda: CarouselView("v", "T"), "set_intro", "intro"),
+        (lambda: CardView("v", "T"), "set_intro", "intro"),
+        (lambda: CarouselView("v", "T"), "set_subtitle", "intro"),
+        (lambda: CardView("v", "T"), "set_subtitle", "intro"),
+        (lambda: CardView("v", "T"), "set_description", "description"),
+        (lambda: CardView("v", "T"), "set_stats_heading", "statsHeading"),
+    ]
+
+    @pytest.mark.parametrize("make,setter,key", SETTERS)
+    def test_key_absent_until_set(self, make, setter, key):
+        assert key not in make().content
+
+    @pytest.mark.parametrize("make,setter,key", SETTERS)
+    def test_refuses_blank(self, make, setter, key):
+        # CardView divergeait : il stockait '' sans broncher.
+        for blank in ("", "   "):
+            with pytest.raises(InvalidParameterError):
+                getattr(make(), setter)(blank)
+
+    @pytest.mark.parametrize("make,setter,key", SETTERS)
+    def test_trims(self, make, setter, key):
+        view = make()
+        getattr(view, setter)("  texte  ")
+        assert view.content[key] == "texte"
+
+
+class TestSubtitleAlias:
+    """Le nom historique reste interchangeable.
+
+    Sans cela, les fournisseurs qui appellent set_subtitle verraient leur
+    ligne disparaitre du rendu.
+    """
+
+    def test_card_alias_matches_set_intro(self):
+        # Card exige une description, une stat ou une section pour etre valide.
+        by_subtitle = CardView("c", "T").set_subtitle("Ligne de contexte").add_stat("a", "1")
+        by_intro = CardView("c", "T").set_intro("Ligne de contexte").add_stat("a", "1")
+        assert by_subtitle.content == by_intro.content
+
+    def test_carousel_alias_matches_set_intro(self):
+        slide = {"id": "s", "title": "Slide"}
+        by_subtitle = CarouselView("c", "T").set_subtitle("Ligne de contexte").add_slide(slide)
+        by_intro = CarouselView("c", "T").set_intro("Ligne de contexte").add_slide(slide)
+        assert by_subtitle.content == by_intro.content
+
+    def test_no_subtitle_key_is_emitted(self):
+        for view in (CardView("c", "T"), CarouselView("c", "T")):
+            view.set_subtitle("x")
+            assert "subtitle" not in view.content
+            assert view.content["intro"] == "x"

@@ -1,0 +1,148 @@
+<h2 id="description">Description</h2>
+
+<p>Le composant <code class="ys-code">QRDisplayView</code> affiche un unique code QR destiné à être scanné par les appareils des utilisateurs. Les cas d'usage courants incluent le partage de codes d'accès, de billets, d'informations de paiement, ou de toute donnée à transmettre par code QR.</p>
+
+<p>Le code QR peut être fourni sous forme d'URL d'image ou de data URI encodée en base64. Le composant prend en charge un seul code QR, avec titre, description et options de configuration.</p>
+
+<h2 id="fields-description">Description des champs</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Identifiant unique de la vue d'affichage QR</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Toujours <code class="ys-code">"QRDisplay"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">QRDisplayContent</code></td><td>Oui</td><td>Objet de contenu de l'affichage QR</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Titre de la vue affiché à l'utilisateur</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Texte d'introduction affiché avant le code QR</td></tr><tr><td><code class="ys-code">content.submit</code></td><td><code class="ys-code">SubmitAction</code></td><td>Non</td><td>Bouton de soumission optionnel pour des actions (par exemple Partager, Exporter)</td></tr><tr><td><code class="ys-code">content.submit.text</code></td><td><code class="ys-code">string</code></td><td>Oui*</td><td>Texte du bouton (requis si submit est défini)</td></tr><tr><td><code class="ys-code">content.submit.method</code></td><td><code class="ys-code">HttpMethod</code></td><td>Non</td><td>Méthode HTTP (par défaut : POST)</td></tr><tr><td><code class="ys-code">content.qrImage</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>URL de l'image du code QR ou data URI en base64</td></tr><tr><td><code class="ys-code">content.qrTitle</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Titre du code QR</td></tr><tr><td><code class="ys-code">content.qrDescription</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Texte de description du code QR</td></tr><tr><td><code class="ys-code">content.qrConfig</code></td><td><code class="ys-code">QRConfig</code></td><td>Non</td><td>Configuration d'affichage du code QR</td></tr><tr><td><code class="ys-code">content.qrConfig.size</code></td><td><code class="ys-code">number</code></td><td>Non</td><td>Taille du code QR en pixels</td></tr><tr><td><code class="ys-code">content.qrConfig.errorCorrection</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Niveau de correction d'erreur : <code class="ys-code">"L"</code>, <code class="ys-code">"M"</code>, <code class="ys-code">"Q"</code>, <code class="ys-code">"H"</code></td></tr><tr><td><code class="ys-code">content.qrConfig.margin</code></td><td><code class="ys-code">number</code></td><td>Non</td><td>Marge autour du code QR</td></tr><tr><td><code class="ys-code">content.qrConfig.color</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Configuration des couleurs</td></tr><tr><td><code class="ys-code">content.qrConfig.color.dark</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Couleur sombre (premier plan)</td></tr><tr><td><code class="ys-code">content.qrConfig.color.light</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Couleur claire (arrière-plan)</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Identifiant de processus pour les parcours multi-étapes</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Métadonnées de la vue (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Méthodes</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Paramètres</th><th>Retour</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Texte d'introduction</td><td><code class="ys-code">this</code></td><td>Définit le texte d'introduction affiché avant le code QR</td></tr><tr><td><code class="ys-code">submitButton(text, method?)</code></td><td><code class="ys-code">text</code> - Texte du bouton<br><code class="ys-code">method</code> - Méthode HTTP (par défaut : POST)</td><td><code class="ys-code">this</code></td><td>Définit le bouton de soumission pour les actions de l'affichage QR</td></tr><tr><td><code class="ys-code">setQRCode(qrImage, title, description, config?)</code></td><td><code class="ys-code">qrImage</code> - URL de l'image QR ou base64<br><code class="ys-code">title</code> - Titre du code QR<br><code class="ys-code">description</code> - Description du code QR<br><code class="ys-code">config</code> - Options QRConfig</td><td><code class="ys-code">this</code></td><td>Définit le code QR à afficher (remplace tout code QR existant)</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Sert la vue avec validation (hérité de BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Renvoie la représentation JSON (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - Clé d'état<br><code class="ys-code">value</code> - Valeur d'état</td><td><code class="ys-code">void</code></td><td>Définit l'état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - Clé d'état</td><td><code class="ys-code">unknown</code></td><td>Lit l'état de la vue (hérité de BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue suivante</td><td><code class="ys-code">this</code></td><td>Contrôle avant d'une séquence paginée, dessiné par le client — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL ou chemin de la vue précédente</td><td><code class="ys-code">this</code></td><td>Contrôle arrière de la même séquence. Ce n'est PAS là que mène le geste de retour — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, ou un entier &lt;= 1</td><td><code class="ys-code">this</code></td><td>Comment cette vue entre dans la pile de navigation du client (défaut : <code class="ys-code">push</code>) — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - position, à partir de 1<br><code class="ys-code">total</code> - longueur de la séquence, si connue</td><td><code class="ys-code">this</code></td><td>Où cette vue se situe dans sa séquence ; le client dessine l'indicateur — voir <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Identifiant de processus<br><code class="ys-code">context</code> - Contexte de processus</td><td><code class="ys-code">this</code></td><td>Définit le contexte de processus (hérité de BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">Exemples de code JavaScript</h2>
+
+<h3 id="basic-qr-display">Affichage QR de base</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const qrDisplay = yeriaApp
+    .createQRDisplayView('qrcode', 'Your QR Code')
+    .setIntro('This code gives you access to premium services')
+    .setQRCode(
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'Subscription Code',
+        'Scan this code to activate your subscription',
+        { size: 200, errorCorrection: 'Q' }
+    );
+
+const response = yeriaApp.serve(qrDisplay);</code></pre>
+
+<h3 id="qr-display-with-url">Affichage QR avec une URL</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('ticket-qr', 'Your Ticket')
+    .setIntro('Present this QR code at the venue')
+    .setQRCode(
+        'https://example.com/qr/ticket-12345.png',
+        'Event Ticket',
+        'Scan this QR code for entry',
+        {
+            size: 250,
+            errorCorrection: 'H',
+            margin: 4
+        }
+    );</code></pre>
+
+<h3 id="qr-display-with-custom-colors">Affichage QR avec couleurs personnalisées</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('branded-qr', 'Branded QR Code')
+    .setIntro('Scan our branded QR code')
+    .setQRCode(
+        'https://example.com/qr/branded.png',
+        'Brand QR',
+        'Scan to visit our website',
+        {
+            size: 220,
+            errorCorrection: 'Q',
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            }
+        }
+    );</code></pre>
+
+<h3 id="qr-display-with-submit-button">Affichage QR avec bouton de soumission</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('share-qr', 'Share QR Code')
+    .setIntro('Share this QR code with others')
+    .setQRCode(
+        'https://example.com/qr/share.png',
+        'Share Code',
+        'Scan to share access',
+        { size: 200 }
+    )
+    .submitButton('Share', 'POST');</code></pre>
+
+<h3 id="qr-display-with-high-error-correction">Affichage QR avec correction d'erreur élevée</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('durable-qr', 'Durable QR Code')
+    .setIntro('This QR code can handle damage')
+    .setQRCode(
+        'https://example.com/qr/durable.png',
+        'Durable Code',
+        'High error correction for damaged codes',
+        {
+            size: 300,
+            errorCorrection: 'H',  // Highest error correction
+            margin: 4
+        }
+    );</code></pre>
+
+<h3 id="qr-display-in-process-workflow">Affichage QR dans un parcours multi-étapes</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const qrDisplay = yeriaApp
+    .createQRDisplayView('verification-qr', 'Verification QR')
+    .setProcess('verification', {
+        processName: 'Account Verification',
+        currentStep: 3,
+        totalSteps: 3,
+        stepName: 'Display QR'
+    })
+    .setIntro('Scan this QR code to complete verification')
+    .setQRCode(
+        'https://example.com/qr/verify.png',
+        'Verification Code',
+        'Scan to verify your account',
+        { size: 250, errorCorrection: 'Q' }
+    )
+    .submitButton('Complete Verification', 'POST');</code></pre>
+
+<h2 id="complete-json-example">Exemple JSON complet</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "ticket-qr",
+  "type": "QRDisplay",
+  "content": {
+    "title": "Your Ticket",
+    "intro": "Present this QR code at the venue",
+    "submit": {
+      "text": "Share",
+      "method": "POST"
+    },
+    "qrImage": "https://example.com/qr/ticket-12345.png",
+    "qrTitle": "Event Ticket",
+    "qrDescription": "Scan this QR code for entry",
+    "qrConfig": {
+      "size": 250,
+      "errorCorrection": "H",
+      "margin": 4,
+      "color": {
+        "dark": "#000000",
+        "light": "#FFFFFF"
+      }
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

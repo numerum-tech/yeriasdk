@@ -126,4 +126,57 @@ console.log(salutation);
   res.json(yeriaApp.serve(reader));
 });
 
+/**
+ * Document paginé — trois pages, chacune servie séparément.
+ *
+ * Le fournisseur n'écrit aucun code d'interface : `setPrev` / `setNext`
+ * donnent les deux flèches, `setPage` donne l'indicateur « Page 2 / 3 » que le
+ * client met en forme dans la langue du lecteur. La première page n'a pas de
+ * précédent, la dernière pas de suivant — le contrôle correspondant se
+ * désactive de lui-même.
+ */
+const PAGES = [
+  {
+    title: 'Rapport annuel — Contexte',
+    body:
+      'Cette première page pose le cadre. Les deux flèches du bas sont ' +
+      'dessinées par le client : le fournisseur a seulement déclaré vers où ' +
+      'elles mènent.',
+  },
+  {
+    title: 'Rapport annuel — Résultats',
+    body:
+      'Deuxième page. L\'indicateur central vient de setPage(2, 3) — des ' +
+      'nombres, mis en forme par le client dans la langue du lecteur.',
+  },
+  {
+    title: 'Rapport annuel — Perspectives',
+    body:
+      'Dernière page : aucun suivant n\'est déclaré, donc le contrôle ' +
+      '« Suivant » est éteint. Le geste de retour, lui, ne feuillette pas — ' +
+      'il quitte le document.',
+  },
+];
+
+router.get('/paged/:n', (req: Request, res: Response) => {
+  const index = Number(req.params.n);
+  if (!Number.isInteger(index) || index < 1 || index > PAGES.length) {
+    return res.status(404).json(YeriaUI.error({
+      code: 'not_found',
+      message: 'Cette page n\'existe pas.',
+    }));
+  }
+
+  const page = PAGES[index - 1]!;
+  const view = YeriaUI
+    .createReaderView(`paged-reader-${index}`, page.title)
+    .addParagraph(page.body)
+    .setPage(index, PAGES.length);
+
+  if (index > 1) view.setPrev(`/api/readers/paged/${index - 1}`);
+  if (index < PAGES.length) view.setNext(`/api/readers/paged/${index + 1}`);
+
+  return res.json(yeriaApp.serve(view));
+});
+
 export default router;

@@ -1,0 +1,98 @@
+<p>Référence du SDK Yeria, disponible pour <strong>JavaScript/TypeScript</strong> (<code class="ys-code">@numerum-tech/yeriasdk</code>) et <strong>Python</strong> (<code class="ys-code">yeriasdk</code>). Les deux implémentations signent de façon byte-identique : une vue construite dans l'une se vérifie dans l'autre.</p>
+
+<p>Chaque spécification de composant contient :</p>
+
+<ul><li><strong>Description du composant</strong> : rôle, cas d'usage et principes de conception</li><li><strong>Tableau des champs</strong> : référence complète avec types, exigences et descriptions</li><li><strong>Exemples de code</strong> : cas concrets d'utilisation du composant</li></ul>
+
+<h2 id="start-here">Par où commencer</h2>
+
+<ul><li><strong><a href="/docs/integration">Intégration provider</a></strong> — de bout en bout : générer votre paire de clés Ed25519, l'enregistrer, vérifier les jetons utilisateurs entrants, récupérer les profils. À lire en premier.</li><li><strong><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a></strong> — les deux points d'entrée du SDK. <code class="ys-code">YeriaUI</code> construit les vues (sans clé) ; <code class="ys-code">YeriaApp</code> détient votre clé et signe.</li><li><strong><a href="/docs/navigation">Navigation</a></strong> — le chemin entre vos écrans : sur quoi retombe le geste de retour, quand un résultat remplace le formulaire qui l'a produit, et comment se pilote une séquence paginée. Recense aussi ce que les clients n'honorent PAS.</li></ul>
+
+<h2 id="view-components">Les vues disponibles</h2>
+
+<h3 id="form-components">Formulaires</h3>
+
+<ul><li><strong><a href="/docs/formview">FormView</a></strong> — formulaires dynamiques : types de champs variés, règles de validation, action de soumission. Gère le texte, l'e-mail, le mot de passe, les nombres, les dates, les listes déroulantes, l'envoi de fichiers, les coordonnées GPS et davantage.</li></ul>
+
+<h3 id="content-display-components">Affichage de contenu</h3>
+
+<ul><li><strong><a href="/docs/readerview">ReaderView</a></strong> — affichage de contenu riche destiné à la lecture. Gère les paragraphes, images, contenus Markdown, listes, liens, tableaux, blocs de code, citations et éléments personnalisés.</li></ul>
+
+<ul><li><strong><a href="/docs/cardview">CardView</a></strong> — fiche compacte mettant en avant un élément unique, avec statistiques, sections et actions. Adaptée à une fiche produit, un profil utilisateur ou le détail d'un événement.</li></ul>
+
+<ul><li><strong><a href="/docs/carouselview">CarouselView</a></strong> — carrousel pour mettre en avant un contenu, une annonce ou une promotion. Gère le défilement automatique, la boucle et des réglages d'affichage.</li></ul>
+
+<ul><li><strong><a href="/docs/timelineview">TimelineView</a></strong> — frise chronologique pour suivre une progression, des étapes d'inscription ou un fil d'activité. Gère les indicateurs d'état (en attente, actif, terminé, erreur).</li></ul>
+
+<ul><li><strong><a href="/docs/mediaview">MediaView</a></strong> — lecteur audio et vidéo avec liste de lecture. Gère plusieurs sources, les affiches et les contrôles de lecture.</li></ul>
+
+<ul><li><strong><a href="/docs/mapview">MapView</a></strong> — carte géographique avec marqueurs, cadrage, contrôles et surcouches. Le backend fournit les données, le moteur de rendu gère le style et les interactions.</li></ul>
+
+<h3 id="action-components">Actions</h3>
+
+<ul><li><strong><a href="/docs/actionlistview">ActionListView</a></strong> — liste verticale d'actions pour un menu de navigation, une liste de fonctionnalités ou un centre de commandes. Chaque action peut porter un titre, une description, une vignette et des métadonnées.</li></ul>
+
+<ul><li><strong><a href="/docs/actiongridview">ActionGridView</a></strong> — grille d'actions pour un tableau de bord ou une navigation par icônes. Nombre de colonnes (1 à 6) et espacement configurables.</li></ul>
+
+<ul><li><strong><a href="/docs/icongridview">IconGridView</a></strong> — grille d'icônes compacte, pour une navigation dense où l'icône prime.</li></ul>
+
+<h3 id="qr-code-components">Codes QR</h3>
+
+<ul><li><strong><a href="/docs/qrscanview">QRScanView</a></strong> — interface de scan de code QR. L'application mobile implémente le scanner ; la vue décrit quoi scanner et où soumettre. Gère la soumission automatique, la validation et les modes d'aperçu.</li></ul>
+
+<ul><li><strong><a href="/docs/qrdisplayview">QRDisplayView</a></strong> — affichage de codes QR pour partager un code d'accès, un billet ou une information de paiement. Gère plusieurs codes, chacun avec son titre, sa description et ses options.</li></ul>
+
+<h3 id="message-components">Messages</h3>
+
+<ul><li><strong><a href="/docs/messageview">MessageView</a></strong> — affichage de message, notification ou alerte. Gère les niveaux de gravité (information, succès, avertissement, erreur) avec une action principale et une action secondaire. Peut être fermable ou exiger une réponse de l'utilisateur.</li></ul>
+
+<h3 id="header-text">Texte d'en-tête</h3>
+
+<p>Chaque vue porte une courte ligne de contexte sous son titre, posée par <code class="ys-code">setIntro(texte)</code> et portée par la clé <code class="ys-code">intro</code>. CardView y ajoute <code class="ys-code">setDescription(texte)</code> pour son paragraphe de corps, qui est un autre rôle. Sur CardView et CarouselView la clé s'appelait <code class="ys-code">subtitle</code> : <code class="ys-code">setSubtitle(texte)</code> est conservé comme alias de <code class="ys-code">setIntro</code> et écrit la même clé. Tous les textes d'en-tête suivent le même contrat :</p>
+
+<ul><li>Le texte est détouré, et une valeur vide ou blanche est refusée par une <code class="ys-code">InvalidParameterError</code>. Une ligne d'en-tête se pose ou n'existe pas : il n'y a pas d'état « vide ».</li><li>Un setter jamais appelé n'émet aucune clé. Le client ne dessine rien pour une clé qu'il ne reçoit pas : une intro non posée ne coûte aucune hauteur.</li></ul>
+
+<h2 id="usage">Utilisation</h2>
+
+<p>Chaque spécification fournit :</p>
+
+<ol><li><strong>La référence complète des champs</strong> — tous les champs disponibles avec leur type, leur exigence et leur description</li><li><strong>Des exemples concrets</strong> — du code réel montrant comment utiliser le composant</li><li><strong>Les bonnes pratiques</strong> — principes de conception et conventions propres à chaque type de vue</li></ol>
+
+<h2 id="quick-start">Démarrage rapide</h2>
+
+<p>Construire une vue ne demande aucune clé ; la signer, si. C'est pourquoi les deux étapes vivent sur deux objets distincts.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaUI, YeriaApp } from '@numerum-tech/yeriasdk';
+
+// Détient votre clé privée Ed25519 — signe, vérifie, dialogue avec Yeria.
+const app = new YeriaApp({
+    appId: 'my-app',
+    baseUrl: process.env.YERIA_BASE_URL,
+    privateKey: process.env.SERVICE_ED25519_PRIVATE_KEY,
+});
+
+// Fabrique sans clé — jamais instanciée, utilisée comme Math ou JSON.
+const form = YeriaUI.createFormView('registration', 'User Registration')
+    .addTextField('name', 'Name', true)
+    .submitButton('Register', 'POST');
+
+// Signature en enveloppe v3 : { payload, signature }
+res.json(app.serve(form));</code></pre>
+
+<p>En Python, même protocole :</p>
+
+<pre class="ys-codeblock" data-lang="python"><code>from yeriasdk import YeriaApp, YeriaAppConfig, YeriaUI
+
+app = YeriaApp(YeriaAppConfig(
+    app_id="my-app",
+    base_url=os.environ["YERIA_BASE_URL"],
+    private_key=os.environ["SERVICE_ED25519_PRIVATE_KEY"],
+))
+
+form = (YeriaUI.create_form_view("registration", "User Registration")
+        .add_text_field("name", "Name", True)
+        .submit_button("Register", "POST"))
+
+envelope = app.serve(form)</code></pre>
+
+<p>Pour le détail de chaque composant, reportez-vous aux spécifications listées ci-dessus.</p>

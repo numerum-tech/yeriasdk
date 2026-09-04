@@ -41,7 +41,6 @@ export class ActionGridView extends BaseActionView {
 
         this.content = {
             title: title,
-            intro: '',
             actions: this.actions,  // Reference to BaseActionView's actions
             columns: 2,
             spacing: 16

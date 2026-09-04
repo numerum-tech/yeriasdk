@@ -4,6 +4,7 @@
 Un SDK TypeScript moderne et optimisé pour générer des interfaces JSON dynamiques, avec support avancé pour les formulaires, la lecture de données, les actions, les QR codes, les messages et l'affichage de données.
 
 🌐 Site web : [yeria.app](https://yeria.app)
+📱 Application Android : [Yeria sur Google Play](https://play.google.com/store/apps/details?id=com.numerum.yeria.app) — le client qui affiche ces vues.
 
 ## 🚀 Fonctionnalités
 
@@ -280,16 +281,16 @@ const quickScan = new QRScanView('scan-ticket', 'Scan Your Ticket')
 // Avec bouton de confirmation (désactive auto-soumission)
 const confirmScan = new QRScanView('verify-product', 'Verify Product')
   .setIntro('Scan the product barcode')
-  .enablePreview(false, 'Product Code')
-  .submitButton('Verify Product');
-// → Scanne → Affiche aperçu → Utilisateur clique "Verify Product" → POST
+  .enablePreview('Product Code')
+  .submitButton('Verify Product', 'Comparez la référence avec l\'étiquette.');
+// → Scanne → Aperçu en lecture seule (+ message rendu en texte d'aide) → clic → POST
 
 // Avec validation : préfixe + format numérique + longueur
 const invoiceScan = new QRScanView('scan-invoice', 'Scan Invoice')
   .setIntro('Scan the invoice QR code')
   .setValidation('Invalid invoice format', 'number', 10, 10, 'INV-')
-  .submitButton('Process Invoice', 'Confirm processing?');
-// → Scanne → Valide (préfixe INV-, chiffres, longueur 10) → Confirmation → POST
+  .submitButton('Process Invoice');
+// → Scanne → Valide (préfixe INV-, chiffres, longueur 10) → clic → POST
 // Accepte : "INV-123456" (10 caractères total)
 
 // Exemple 4 : Code PIN numérique exact
@@ -744,10 +745,10 @@ Gestion des actions et navigation :
 ### QRScanView
 Scanner de QR codes (v2.0 - API simplifiée) :
 - `setIntro()` - Instructions pour l'utilisateur
-- `submitButton()` - Bouton de confirmation (désactive auto-soumission)
+- `submitButton(text, confirmMessage?)` - Bouton de confirmation (désactive auto-soumission) ; `confirmMessage` est rendu en texte d'aide à côté de la valeur scannée, PAS en boîte de dialogue (le tap sur le bouton est déjà la confirmation)
 - `setValidation(errorMessage, format?, minLength?, maxLength?, startsWith?)` - Règles de validation
   - Formats : `'text'`, `'number'`, `'url'`, `'email'`
-- `enablePreview()` / `disablePreview()` - Aperçu avant soumission
+- `enablePreview(label?)` / `disablePreview()` - Aperçu **en lecture seule** de la valeur scannée (jamais éditable : une valeur re-saisissable permettrait d'envoyer n'importe quoi comme si elle avait été scannée)
 - `setAutoSubmit()` - Activer/désactiver soumission automatique
 - **Convention** : Nom de champ toujours `qrData`
 
@@ -825,8 +826,9 @@ Afficher des emplacements :
 #### QRScanView
 - ✅ **Scanner** des QR codes avec auto-soumission
 - ✅ **Validation** des codes scannés (format, longueur)
-- ✅ **Aperçu** et édition manuelle avant soumission
+- ✅ **Aperçu** en lecture seule avant soumission
 - ✅ **Workflows de confirmation** avec boutons
+- ✅ **Scan refusé** : le scanner s'arrête et affiche `validation.errorMessage` (la valeur refusée n'est jamais réaffichée)
 - **Méthodes** : `setIntro()`, `submitButton()`, `setValidation()`, `enablePreview()`
 
 #### QRDisplayView

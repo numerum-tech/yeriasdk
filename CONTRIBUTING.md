@@ -65,6 +65,36 @@ npm run build
 - Include examples for new functionality
 - Update CHANGELOG.md
 
+#### Writing a spec page
+
+Provider-facing documentation lives in `specs/`. Three rules, no exceptions:
+
+1. **Write the HTML pair, not Markdown.** A page is two body fragments:
+   `specs/en/<page>.html` and `specs/fr/<page>.html`. No `<html>`, no `<head>`,
+   no framework tag — the site wraps them. They are the source.
+
+   The `specs/*.md` siblings are kept — they are what a reader sees on GitHub —
+   but how they stay current is **not settled yet**: today they are edited by
+   hand, and they have already drifted from the HTML on several pages.
+   `scripts/render-specs-md.py` can regenerate them, and `--check` reports which
+   are stale; it is deliberately not wired into any pipeline until the drift is
+   reconciled. Until then, if you change a page, change both.
+2. **The two languages stay aligned.** Same headings, same tables, same code
+   blocks, in the same order. **Anchors (`id`) stay in English in both files**:
+   an anchor is a URL fragment, and a deep link must survive a language switch.
+   `python3 specs/check-fr.py specs/fr/<page>.html` flags prose left in English.
+3. **A page only exists once it is listed.** Add it to
+   `yeria-ui/definitions/docs-catalog.js`, then run `yeria-ui/sync-docs.sh` to
+   mirror the fragments into the site and colour the code blocks.
+
+Markup the site's stylesheet expects: `<h2 id="…">` / `<h3 id="…">`, `<p>`,
+`<ul><li>`, `<div class="ys-table-wrap"><table>…`, inline `<code class="ys-code">`,
+and `<pre class="ys-codeblock" data-lang="javascript"><code>…`.
+
+Run your samples before you write them down. A documented call that does not
+exist is worse than an undocumented one — and if the clients do not honour a
+field yet, say so on the page rather than letting it read as a working feature.
+
 ## Questions?
 
 Feel free to open an issue for any questions about contributing.

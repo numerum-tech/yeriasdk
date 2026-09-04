@@ -38,9 +38,8 @@ router.get('/info', (req: Request, res: Response) => {
     .setIntro('Notification importante')
     .setBody('Ceci est un message informatif. Il fournit des informations utiles à l\'utilisateur. Vous pouvez le fermer en cliquant sur ignorer ou continuer pour en savoir plus.')
     .setSeverity('info')
-    .setPrimaryAction('En Savoir Plus', 'GET')
-    .setSecondaryAction('Ignorer', 'POST')
-    .setDismissible(true)
+    .addAction('En Savoir Plus')
+    .addAction('Ignorer')
     .setMetadata({
       messageId: 'MSG-INFO-001',
       category: 'information',
@@ -58,9 +57,8 @@ router.get('/success', (req: Request, res: Response) => {
     .setIntro('Confirmation de succès')
     .setBody('Votre paiement de 299,99 € a été traité avec succès. Un email de confirmation a été envoyé à votre adresse enregistrée.')
     .setSeverity('success')
-    .setPrimaryAction('Voir le Reçu', 'GET')
-    .setSecondaryAction('Continuer les Achats', 'GET')
-    .setDismissible(true)
+    .addAction('Voir le Reçu')
+    .addAction('Continuer les Achats')
     .setMetadata({
       messageId: 'MSG-SUCCESS-001',
       category: 'payment',
@@ -80,9 +78,8 @@ router.get('/warning', (req: Request, res: Response) => {
     .setIntro('Avertissement : Espace Faible')
     .setBody('Votre stockage est utilisé à 92%. Envisagez de mettre à niveau votre forfait ou de supprimer des fichiers inutiles pour libérer de l\'espace et éviter toute interruption de service.')
     .setSeverity('warning')
-    .setPrimaryAction('Mettre à Niveau', 'POST')
-    .setSecondaryAction('Gérer les Fichiers', 'GET')
-    .setDismissible(true)
+    .addAction('Mettre à Niveau')
+    .addAction('Gérer les Fichiers')
     .setMetadata({
       messageId: 'MSG-WARNING-001',
       category: 'storage',
@@ -102,9 +99,8 @@ router.get('/error', (req: Request, res: Response) => {
     .setIntro('Impossible de se connecter')
     .setBody('Nous n\'avons pas pu nous connecter au serveur. Veuillez vérifier votre connexion Internet et réessayer. Si le problème persiste, contactez le support.')
     .setSeverity('error')
-    .setPrimaryAction('Réessayer', 'POST')
-    .setSecondaryAction('Contacter le Support', 'GET')
-    .setDismissible(false)
+    .addAction('Réessayer')
+    .addAction('Contacter le Support')
     .setMetadata({
       messageId: 'MSG-ERROR-001',
       category: 'connection',

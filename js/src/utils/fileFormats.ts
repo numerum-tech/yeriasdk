@@ -28,6 +28,8 @@ export const fileFormats: Record<string, string> = {
     ogg: "audio/ogg",
     aac: "audio/aac",
     wma: "audio/x-ms-wma",
+    m4a: "audio/mp4",       // AAC in an MPEG-4 container — what iOS records by default
+    opus: "audio/opus",     // what Android's recorder emits in an ogg/webm container
 
     // Video
     mp4: "video/mp4",
@@ -36,6 +38,7 @@ export const fileFormats: Record<string, string> = {
     wmv: "video/x-ms-wmv",
     flv: "video/x-flv",
     webm: "video/webm",
+    "3gp": "video/3gpp",    // low-bitrate capture container still emitted by some Android devices
 
     // Archives
     zip: "application/zip",
@@ -151,8 +154,8 @@ export class FileFormatManager {
         return {
             documents: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt', 'rtf'],
             images: ['png', 'jpeg', 'jpg', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'ico'],
-            audio: ['mp3', 'wav', 'ogg', 'aac', 'wma'],
-            video: ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'],
+            audio: ['mp3', 'wav', 'ogg', 'aac', 'wma', 'm4a', 'opus'],
+            video: ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', '3gp'],
             archives: ['zip', 'rar', '7z', 'tar', 'gz'],
             code: ['json', 'xml', 'html', 'css', 'js', 'ts', 'py', 'java', 'cpp', 'c'],
             other: ['sql', 'yaml', 'yml', 'md', 'log']

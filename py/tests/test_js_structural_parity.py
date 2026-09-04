@@ -75,7 +75,7 @@ def _build(ui, name):
         )
     if name == "card":
         return (
-            ui.create_card_view("cd", "Card").set_subtitle("sub").set_description("desc")
+            ui.create_card_view("cd", "Card").set_intro("sub").set_description("desc")
             .add_stat("Views", "42").add_action("/open", "Open").to_json()
         )
     if name == "timeline":

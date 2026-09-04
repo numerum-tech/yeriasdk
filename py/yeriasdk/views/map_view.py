@@ -10,11 +10,13 @@ auto-created on first call) or a named layer (passed via the optional final
 ``layer_id`` argument). Named layers must be declared via ``add_layer``.
 """
 
+import math
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from ..core.base_view import BaseView
 from ..types.models import (
+    ActionRef,
     GeoPoint,
     GeoBounds,
     MapBasemap,
@@ -63,6 +65,19 @@ def _strip_none(d: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in d.items() if v is not None}
 
 
+def _action_to_dict(a: ActionRef) -> Dict[str, Any]:
+    return _strip_none({
+        "url": a.url,
+        "method": a.method,
+        "body": a.body,
+        "confirm": _strip_none({
+            "title": a.confirm.title,
+            "message": a.confirm.message,
+            "submitLabel": a.confirm.submit_label,
+        }) if a.confirm else None,
+    })
+
+
 def _marker_to_dict(m: MapMarker) -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "id": m.id.strip(),
@@ -73,24 +88,16 @@ def _marker_to_dict(m: MapMarker) -> Dict[str, Any]:
         if v is not None:
             out[src] = v.strip() if isinstance(v, str) and src in ("title", "description") else v
     if m.action is not None:
-        out["action"] = _strip_none({
-            "url": m.action.url,
-            "method": m.action.method,
-            "body": m.action.body,
-            "confirm": _strip_none({
-                "title": m.action.confirm.title,
-                "message": m.action.confirm.message,
-                "submitLabel": m.action.confirm.submit_label,
-            }) if m.action.confirm else None,
-        })
+        out["action"] = _action_to_dict(m.action)
     if m.popup is not None:
         out["popup"] = _strip_none({
             "title": m.popup.title,
             "body": m.popup.body,
             "image": m.popup.image,
-            "actions": [_strip_none({
-                "url": a.url, "method": a.method, "body": a.body,
-            }) for a in m.popup.actions] if m.popup.actions else None,
+            # Same emitter as the marker's own action: a popup action used
+            # to lose its `confirm` here, which JS carried through.
+            "actions": [_action_to_dict(a) for a in m.popup.actions]
+            if m.popup.actions else None,
         })
     return out
 
@@ -116,6 +123,10 @@ def _shape_to_dict(s: MapShape) -> Dict[str, Any]:
             "strokeWidth": s.config.stroke_width,
             "dashed": s.config.dashed,
         })
+    # `MapShape.action` existed on the dataclass and in the spec, and was
+    # never emitted: a Python provider's tappable zone was silent on the map.
+    if s.action is not None:
+        out["action"] = _action_to_dict(s.action)
     if s.meta is not None:
         out["meta"] = s.meta
     return out
@@ -215,13 +226,88 @@ def _pick_to_dict(p: MapPickConfig) -> Dict[str, Any]:
 
 # ─── validation helpers ────────────────────────────────────────────────
 
+# Un nombre qui peut voyager : `nan` et `±inf` n'ont pas de forme JSON —
+# `json.dumps` ecrit `NaN`, le JS ecrit `null`, et une charge utile signee qui
+# porte l'un ou l'autre est illisible par tout client. `bool` est exclu, etant
+# une sous-classe de `int`. Meme regle que les champs numeriques du
+# formulaire (`validate_number`), appliquee a chaque nombre d'une carte.
+def _is_finite_number(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _assert_finite_if_set(value: Any, name: str, ctx: str) -> None:
+    if value is not None and not _is_finite_number(value):
+        raise InvalidParameterError(name, value, f"{ctx}: {name} must be a finite number")
+
+
+def _assert_no_non_finite_number(value: Any, ctx: str) -> None:
+    """Le GeoJSON `data` est opaque pour le SDK et copie tel quel dans la
+    charge utile : on le parcourt en entier. Un nombre non fini n'importe ou
+    dedans — coordonnees, bbox, propriete — n'a pas de forme JSON : refus.
+    Les booleens restent admis, ce sont des proprietes GeoJSON legitimes."""
+    if isinstance(value, bool):
+        return
+    if isinstance(value, float) and not math.isfinite(value):
+        raise InvalidParameterError("data", value, f"{ctx}: contains a non-finite number")
+    if isinstance(value, dict):
+        for v in value.values():
+            _assert_no_non_finite_number(v, ctx)
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            _assert_no_non_finite_number(v, ctx)
+
+
+def _assert_style_finite(style: MapShapeStyle, ctx: str) -> None:
+    _assert_finite_if_set(style.fill_opacity, "fillOpacity", ctx)
+    _assert_finite_if_set(style.stroke_opacity, "strokeOpacity", ctx)
+    _assert_finite_if_set(style.stroke_width, "strokeWidth", ctx)
+
+
 def _validate_geo_point(p: Optional[GeoPoint], ctx: str) -> None:
     if p is None or not isinstance(p, GeoPoint):
         raise InvalidGeoPointError(p, f"{ctx}: location is required")
-    if not isinstance(p.lat, (int, float)) or p.lat < -90 or p.lat > 90:
-        raise InvalidGeoPointError(p, f"{ctx}: lat must be a number in [-90, 90]")
-    if not isinstance(p.lon, (int, float)) or p.lon < -180 or p.lon > 180:
-        raise InvalidGeoPointError(p, f"{ctx}: lon must be a number in [-180, 180]")
+    # `nan` passe toutes les comparaisons ci-dessous : la finitude d'abord.
+    if not _is_finite_number(p.lat) or p.lat < -90 or p.lat > 90:
+        raise InvalidGeoPointError(p, f"{ctx}: lat must be a finite number in [-90, 90]")
+    if not _is_finite_number(p.lon) or p.lon < -180 or p.lon > 180:
+        raise InvalidGeoPointError(p, f"{ctx}: lon must be a finite number in [-180, 180]")
+    if p.altitude is not None and not _is_finite_number(p.altitude):
+        raise InvalidGeoPointError(p, f"{ctx}: altitude must be a finite number")
+    if p.precision is not None and not _is_finite_number(p.precision):
+        raise InvalidGeoPointError(p, f"{ctx}: precision must be a finite number")
+
+
+def _validate_layer(layer: MapLayer) -> None:
+    """Une couche passee a add_layer porte ses propres marqueurs, formes ou
+    points ; ils subissent les memes controles que ceux ajoutes un a un."""
+    ctx = f'layer "{layer.id}"'
+    _assert_finite_if_set(layer.z_index, "zIndex", ctx)
+    _assert_finite_if_set(layer.min_zoom, "minZoom", ctx)
+    _assert_finite_if_set(layer.max_zoom, "maxZoom", ctx)
+    if layer.type == "markers":
+        for m in layer.markers or []:
+            _validate_geo_point(m.location, f'marker "{m.id}".location')
+        _assert_finite_if_set(layer.cluster_radius, "clusterRadius", ctx)
+    elif layer.type == "shapes":
+        for s in layer.shapes or []:
+            _validate_shape(s)
+    elif layer.type == "heatmap":
+        for i, p in enumerate(layer.points or []):
+            pctx = f"{ctx} points[{i}]"
+            if not _is_finite_number(p.lat) or not _is_finite_number(p.lon):
+                raise InvalidParameterError("points", p, f"{pctx}: lat and lon must be finite numbers")
+            _assert_finite_if_set(p.intensity, "intensity", pctx)
+        _assert_finite_if_set(layer.radius, "radius", ctx)
+        _assert_finite_if_set(layer.intensity_max, "intensityMax", ctx)
+    elif layer.type == "tiles":
+        _assert_finite_if_set(layer.max_native_zoom, "maxNativeZoom", ctx)
+        _assert_finite_if_set(layer.opacity, "opacity", ctx)
+    elif layer.type == "geojson":
+        _assert_no_non_finite_number(layer.data, f"{ctx}.data")
+        if layer.default_shape_style is not None:
+            _assert_style_finite(layer.default_shape_style, ctx)
 
 
 def _validate_shape(s: MapShape) -> None:
@@ -237,8 +323,8 @@ def _validate_shape(s: MapShape) -> None:
             _validate_geo_point(p, f'Polyline "{s.id}" points[{i}]')
     elif s.type == "Circle":
         _validate_geo_point(s.center, f'Circle "{s.id}" center')
-        if not isinstance(s.radius, (int, float)) or s.radius <= 0:
-            raise InvalidParameterError("radius", s.radius, "Circle radius must be > 0 (meters)")
+        if not _is_finite_number(s.radius) or s.radius <= 0:
+            raise InvalidParameterError("radius", s.radius, "Circle radius must be a finite number > 0 (meters)")
     elif s.type == "Rectangle":
         _validate_geo_point(s.sw, f'Rectangle "{s.id}" sw')
         _validate_geo_point(s.ne, f'Rectangle "{s.id}" ne')
@@ -250,9 +336,16 @@ def _validate_shape(s: MapShape) -> None:
             )
     else:
         raise InvalidParameterError("shape.type", s.type, "unknown shape type")
+    if s.config is not None:
+        _assert_style_finite(s.config, f'shape "{s.id}".config')
 
 
 def _validate_viewport(v: MapViewport) -> None:
+    # `nan` passe tous les controles de plage ci-dessous : la finitude d'abord.
+    for name, value in (("zoom", v.zoom), ("minZoom", v.min_zoom), ("maxZoom", v.max_zoom),
+                        ("bearing", v.bearing), ("pitch", v.pitch)):
+        if value is not None and not _is_finite_number(value):
+            raise InvalidViewportError(f"{name} must be a finite number")
     if v.center is not None:
         _validate_geo_point(v.center, "viewport.center")
     if v.bounds is not None:
@@ -380,6 +473,7 @@ class MapView(BaseView):
         layers: List[Dict[str, Any]] = self.content["layers"]
         if any(l.get("id") == layer.id for l in layers):
             raise DuplicateLayerIdError(layer.id)
+        _validate_layer(layer)
         layers.append(_layer_to_dict(layer))
         return self
 
@@ -497,6 +591,10 @@ class MapView(BaseView):
             raise LayerTypeMismatchError(target, "shapes", layer.get("type", "unknown"))
         layer["shapes"] = []
         return self
+
+    def get_content(self) -> Dict[str, Any]:
+        """Get the map content"""
+        return self.content
 
     # ─── private helpers ──────────────────────────────────────────────
 

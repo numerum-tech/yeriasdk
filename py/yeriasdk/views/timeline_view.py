@@ -42,7 +42,6 @@ class TimelineView(BaseView):
 
         self.content = {
             "title": title,
-            "intro": "",
             "items": [],
         }
 

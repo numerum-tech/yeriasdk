@@ -71,7 +71,9 @@ export function buildProviderError(spec: ProviderErrorSpec): ProviderErrorBody {
         throw new InvalidParameterError('message', spec.message, 'must be a non-empty string');
     }
     const error: ProviderErrorObject = {
-        status: typeof spec.status === 'number' ? spec.status : 400,
+        // Finite, or the advisory default: `NaN` is a number too, and it
+        // would have been signed as `null`.
+        status: typeof spec.status === 'number' && Number.isFinite(spec.status) ? spec.status : 400,
         code: spec.code,
         message: spec.message,
     };

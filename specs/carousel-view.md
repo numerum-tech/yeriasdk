@@ -20,7 +20,7 @@ The carousel supports autoplay, looping, and configurable display settings.
 | `type` | `string` | Yes | Always `"Carousel"` |
 | `content` | `CarouselContent` | Yes | Carousel content object |
 | `content.title` | `string` | Yes | Carousel title (set in constructor) |
-| `content.subtitle` | `string` | No | Optional subtitle |
+| `content.intro` | `string` | No | Optional line of context under the title. Formerly named `subtitle`. |
 | `content.slides` | `CarouselSlide[]` | Yes | Array of slides (at least one required) |
 | `content.slides[].id` | `string` | Yes | Unique identifier for the slide |
 | `content.slides[].title` | `string` | Yes | Slide title |
@@ -49,7 +49,8 @@ The carousel supports autoplay, looping, and configurable display settings.
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `setSubtitle(subtitle)` | `subtitle` - Subtitle text | `this` | Sets the optional subtitle shown beneath the carousel heading |
+| `setIntro(intro)` | `intro` - Introduction text | `this` | Sets the line of context shown beneath the carousel heading. Refuses a blank value |
+| `setSubtitle(subtitle)` | `subtitle` - Introduction text | `this` | Historical name of `setIntro`, kept. Writes the same key |
 | `setSettings(settings)` | `settings` - CarouselSettings object | `this` | Overrides default autoplay and indicator behavior |
 | `addSlide(slide)` | `slide` - CarouselSlide object | `this` | Adds a prepared slide to the carousel |
 | `createSlide(id, title, description?, options?)` | `id` - Slide ID<br>`title` - Slide title<br>`description` - Optional description<br>`options` - Slide options (imageUrl, imageAlt, badge) | `CarouselSlide` | Creates a slide object (does not add it) |
@@ -60,8 +61,10 @@ The carousel supports autoplay, looping, and configurable display settings.
 | `toJSON()` | - | `Record<string, unknown>` | Returns JSON representation (inherited from BaseView) |
 | `setState(key, value)` | `key` - State key<br>`value` - State value | `void` | Sets view state (inherited from BaseView) |
 | `getState(key)` | `key` - State key | `unknown` | Gets view state (inherited from BaseView) |
-| `setNext(url)` | `url` - Next view URL | `this` | Sets next view navigation (inherited from BaseView) |
-| `setPrev(url)` | `url` - Previous view URL | `this` | Sets previous view navigation (inherited from BaseView) |
+| `setNext(url)` | `url` - URL or path of the next view | `this` | Forward control of a paginated sequence, drawn by the client — see the Navigation reference on the docs site |
+| `setPrev(url)` | `url` - URL or path of the previous view | `this` | Backward control of the same sequence. NOT where the back gesture leads — see the Navigation reference on the docs site |
+| `setEntry(entry)` | `entry` - `'push'`, `'replace'`, or an integer <= 1 | `this` | How this view enters the client's navigation stack (default: `push`) — see the Navigation reference on the docs site |
+| `setPage(current, total?)` | `current` - 1-based position<br>`total` - sequence length, when known | `this` | Where this view sits in its sequence; the client draws the indicator — see the Navigation reference on the docs site |
 | `setProcess(processId, context?)` | `processId` - Process ID<br>`context` - Process context | `this` | Sets process context (inherited from BaseView) |
 
 ## JavaScript Sample Code
@@ -95,7 +98,7 @@ const response = yeriaApp.serve(carousel);
 ```javascript
 const carousel = yeriaApp
     .createCarouselView('promotions', 'Special Offers')
-    .setSubtitle('Limited time offers')
+    .setIntro('Limited time offers')
     .addSlide(
         carousel.createSlide('offer-1', 'Offer 1', 'Description 1', {
             imageUrl: 'https://example.com/offer1.jpg',
@@ -198,7 +201,7 @@ const carousel = yeriaApp
 ```javascript
 const carousel = yeriaApp
     .createCarouselView('banner', 'Banner')
-    .setSubtitle('Scroll through our content')
+    .setIntro('Scroll through our content')
     .addSlide(
         carousel.createSlide('slide-1', 'Slide 1', 'First slide')
     )
@@ -250,7 +253,7 @@ const carousel = yeriaApp
         currentStep: 1,
         totalSteps: 3
     })
-    .setSubtitle('Learn about our features')
+    .setIntro('Learn about our features')
     .addSlide(
         carousel.createSlide('step-1', 'Step 1', 'Create your account', {
             imageUrl: 'https://example.com/step1.jpg'
@@ -279,7 +282,7 @@ const carousel = yeriaApp
 ```javascript
 const carousel = yeriaApp
     .createCarouselView('homepage-hero', 'Welcome')
-    .setSubtitle('Discover what we offer')
+    .setIntro('Discover what we offer')
     .addSlide(
         carousel.createSlide('feature-1', 'Feature 1', 'Amazing feature description', {
             imageUrl: 'https://example.com/feature1.jpg',
@@ -323,7 +326,7 @@ const carousel = yeriaApp
   "type": "Carousel",
   "content": {
     "title": "Featured Content",
-    "subtitle": "Scroll through our highlights",
+    "intro": "Scroll through our highlights",
     "slides": [
       {
         "id": "release-2-0",

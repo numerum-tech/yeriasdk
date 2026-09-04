@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 from ..core.base_view import BaseView
-from ..types.models import CarouselSettings, CarouselSlide, CardAction, HttpMethod, CardActionVariant
+from ..types.models import CarouselSettings, CarouselSlide, CardAction, CardImage, HttpMethod, CardActionVariant
 from ..errors.exceptions import MissingRequiredParameterError, ElementNotFoundError
 from ..core.yeria_link import YeriaLink
 
@@ -42,69 +42,81 @@ class CarouselView(BaseView):
             }
         )
 
+        # Pas de `settings` tant que le fournisseur n'en pose pas : les quatre
+        # defauts documentes etaient ecrits ici, si bien qu'un carrousel nu
+        # emettait des clefs que personne n'avait demandees. Le client porte
+        # les memes defauts.
         self.content = {
             "title": title,
-            "subtitle": "",
             "slides": [],
-            "settings": {
-                "autoplay": False,
-                "intervalMs": 6000,
-                "loop": True,
-                "showIndicators": True,
-            },
         }
 
+    def set_intro(self, intro: str) -> "CarouselView":
+        """Set the line of context shown beneath the carousel heading"""
+        return self._set_intro_text("intro", intro)
+
     def set_subtitle(self, subtitle: str) -> "CarouselView":
-        """Set optional subtitle shown beneath the carousel heading"""
-        return self._set_intro_text("subtitle", subtitle)
+        """Nom historique de set_intro, conserve. Ecrit la meme cle."""
+        return self.set_intro(subtitle)
 
     def set_settings(self, settings: CarouselSettings | Dict[str, Any]) -> "CarouselView":
         """Override default autoplay and indicator behaviour"""
         if isinstance(settings, dict):
-            self.content["settings"] = {
-                "autoplay": settings.get("autoplay", False),
-                "intervalMs": settings.get("intervalMs", 6000),
-                "loop": settings.get("loop", True),
-                "showIndicators": settings.get("showIndicators", True),
+            raw = {
+                "autoplay": settings.get("autoplay"),
+                "intervalMs": settings.get("intervalMs"),
+                "loop": settings.get("loop"),
+                "showIndicators": settings.get("showIndicators"),
             }
         else:
-            self.content["settings"] = {
+            raw = {
                 "autoplay": settings.autoplay,
                 "intervalMs": settings.interval_ms,
                 "loop": settings.loop,
                 "showIndicators": settings.show_indicators,
             }
+        # Seules les clefs posees par le fournisseur sortent. Les quatre
+        # defauts documentes (autoplay false, intervalMs 6000, loop true,
+        # showIndicators true) etaient injectes ici, si bien qu'un
+        # `set_settings({"loop": False})` emettait trois clefs que personne
+        # n'avait demandees — le SDK JS n'en emettait aucune, et le client
+        # porte deja les memes defauts. Un defaut appartient au client.
+        cleaned = {k: v for k, v in raw.items() if v is not None}
+        if cleaned:
+            self.content["settings"] = cleaned
+        else:
+            self.content.pop("settings", None)
         return self
 
     def add_slide(self, slide: CarouselSlide | Dict[str, Any]) -> "CarouselView":
         """Append a prepared slide to the carousel sequence"""
 
-        # Handle dictionary input
+        # A dict is lifted into the dataclass and takes the same road: the
+        # dict branch used to serialise on its own and stopped at `image`, so
+        # a slide written as a dict lost its `actions` and `meta` in silence.
         if isinstance(slide, dict):
-            slide_id = slide.get("id", "")
-            slide_title = slide.get("title", "")
+            image = slide.get("image")
+            actions = slide.get("actions")
+            slide = CarouselSlide(
+                id=slide.get("id") or "",
+                title=slide.get("title") or "",
+                description=slide.get("description"),
+                badge=slide.get("badge"),
+                image=CardImage(url=image.get("url", ""), alt=image.get("alt")) if image else None,
+                actions=[
+                    CardAction(
+                        text=a.get("text", ""),
+                        method=a.get("method"),
+                        confirm_message=a.get("confirmMessage", a.get("confirm_message")),
+                        href=a.get("href"),
+                        icon=a.get("icon"),
+                        variant=a.get("variant"),
+                    )
+                    for a in actions
+                ] if actions else None,
+                meta=slide.get("meta"),
+            )
 
-            if not slide_id or not slide_title:
-                raise MissingRequiredParameterError("slide id and title")
-
-            slide_dict = {
-                "id": slide_id.strip(),
-                "title": slide_title.strip(),
-                "description": slide.get("description", "").strip() if slide.get("description") else None,
-                "badge": slide.get("badge", "").strip() if slide.get("badge") else None,
-            }
-
-            if slide.get("image"):
-                img = slide["image"]
-                slide_dict["image"] = {
-                    "url": img.get("url", ""),
-                    "alt": img.get("alt", ""),
-                }
-
-            self.content["slides"].append(slide_dict)
-            return self
-
-        # Handle CarouselSlide object (original logic)
         if not slide.id or not slide.title:
             raise MissingRequiredParameterError("slide id and title")
 

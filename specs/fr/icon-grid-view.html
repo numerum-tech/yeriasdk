@@ -1,0 +1,81 @@
+<h2 id="description">Description</h2>
+
+<p>Le composant <code class="ys-code">IconGridView</code> présente des actions sous forme de <strong>grille de type lanceur d'applications</strong> : chaque action est une <strong>tuile image carrée ou circulaire avec son libellé en dessous</strong>. Il est plus dense et plus orienté icône que <code class="ys-code">ActionGridView</code> (qui affiche des cartes image + titre + texte).</p>
+
+<p>Il partage le même modèle d'action et le même comportement de navigation que les autres vues d'action : lorsqu'une action est sélectionnée, l'application mobile appelle <code class="ys-code">{currentUrl}/{actionCode}</code> (même flux que <code class="ys-code">ActionGrid</code> / <code class="ys-code">ActionList</code>).</p>
+
+<p>Utilisez-le pour les tableaux de bord, les lanceurs ou les sélecteurs de catégories, là où une disposition compacte icône-plus-libellé se lit mieux que des cartes complètes.</p>
+
+<h2 id="fields-description">Détail des champs</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Identifiant unique de la grille d'icônes</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Toujours <code class="ys-code">"IconGrid"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">IconGridContent</code></td><td>Oui</td><td>Objet de contenu de la grille d'icônes</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Titre facultatif affiché au-dessus de la grille</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Texte d'introduction facultatif affiché avant la grille</td></tr><tr><td><code class="ys-code">content.shape</code></td><td><code class="ys-code">"circle" | "square"</code></td><td>Non</td><td>Forme appliquée à <strong>toutes</strong> les tuiles (par défaut : <code class="ys-code">"circle"</code>)</td></tr><tr><td><code class="ys-code">content.columns</code></td><td><code class="ys-code">number</code></td><td>Non</td><td>Nombre de colonnes (2-6, par défaut : 4)</td></tr><tr><td><code class="ys-code">content.spacing</code></td><td><code class="ys-code">number</code></td><td>Non</td><td>Espacement entre les tuiles, en pixels (par défaut : 12)</td></tr><tr><td><code class="ys-code">content.actions</code></td><td><code class="ys-code">ActionConfig[]</code></td><td>Oui</td><td>Tableau des actions (au moins une action requise)</td></tr><tr><td><code class="ys-code">content.actions[].code</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Code d'action unique (utilisé dans la requête)</td></tr><tr><td><code class="ys-code">content.actions[].title</code></td><td><code class="ys-code">string</code></td><td>Oui</td><td>Libellé affiché <strong>sous</strong> la tuile</td></tr><tr><td><code class="ys-code">content.actions[].thumbnail</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>URL de l'image rendue <strong>à l'intérieur</strong> de la tuile (détourée selon <code class="ys-code">shape</code>)</td></tr><tr><td><code class="ys-code">content.actions[].badge</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Petit texte en surimpression sur la tuile (par ex. <code class="ys-code">"3"</code>, <code class="ys-code">"New"</code>)</td></tr><tr><td><code class="ys-code">content.actions[].disabled</code></td><td><code class="ys-code">boolean</code></td><td>Non</td><td>Indique si la tuile est désactivée — grisée et non cliquable (par défaut : false)</td></tr><tr><td><code class="ys-code">content.actions[].desc</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Texte descriptif facultatif. <strong>Conservé par symétrie, mais le moteur de rendu mobile IconGrid l'ignore</strong> (aucun texte sous l'icône hormis le libellé).</td></tr><tr><td><code class="ys-code">content.actions[].metadata</code></td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Non</td><td>Métadonnées facultatives associées à l'action</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>Non</td><td>Identifiant de processus pour les parcours en plusieurs étapes</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>Non</td><td>Métadonnées de la vue (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<blockquote><p>Notes de rendu (mobile) : l'image <code class="ys-code">thumbnail</code> est détourée en cercle (<code class="ys-code">shape:"circle"</code>) ou en carré arrondi (<code class="ys-code">shape:"square"</code>) ; le libellé <code class="ys-code">title</code> se place sous la tuile, sur une seule ligne avec troncature ; <code class="ys-code">badge</code> s'affiche en petite surimpression en haut à droite de la tuile ; une tuile <code class="ys-code">disabled</code> est atténuée et non cliquable. <code class="ys-code">desc</code> n'est <strong>pas</strong> rendu.  <strong>URL des ressources (valable pour tous les composants SGUI) :</strong> <code class="ys-code">thumbnail</code> — comme toute ressource image ou média d'une vue fournisseur — doit être un <strong>chemin relatif</strong>, résolu par le client par rapport à la <strong>base du service</strong> (l'URL de la vue elle-même). Les valeurs absolues <code class="ys-code">http(s)://</code>, <code class="ys-code">//host</code>, <code class="ys-code">file://</code> et <code class="ys-code">data:</code> sont <strong>rejetées</strong> par le moteur de rendu (aucun hôte externe, aucun trafic en clair, aucune charge utile locale ou intégrée). Pour servir des ressources depuis un CDN, renvoyez un chemin relatif dont l'endpoint <strong>redirige en 302 vers une URL CDN signée à durée de vie courte</strong> — le client ou le lecteur suit la redirection de manière transparente.</p></blockquote>
+
+<h2 id="methods">Méthodes</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Paramètres</th><th>Retour</th><th>Rôle</th></tr></thead><tbody><tr><td><code class="ys-code">setTitle(title)</code></td><td><code class="ys-code">title</code></td><td><code class="ys-code">this</code></td><td>Définit le titre au-dessus de la grille</td></tr><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code></td><td><code class="ys-code">this</code></td><td>Définit le texte d'introduction au-dessus de la grille</td></tr><tr><td><code class="ys-code">setShape(shape)</code></td><td><code class="ys-code">shape</code> — <code class="ys-code">"circle" | "square"</code></td><td><code class="ys-code">this</code></td><td>Définit la forme appliquée à toutes les tuiles</td></tr><tr><td><code class="ys-code">setColumns(columns)</code></td><td><code class="ys-code">columns</code> — 2-6</td><td><code class="ys-code">this</code></td><td>Définit le nombre de colonnes</td></tr><tr><td><code class="ys-code">setSpacing(spacing)</code></td><td><code class="ys-code">spacing</code> — px (&gt;= 0)</td><td><code class="ys-code">this</code></td><td>Définit l'espacement entre les tuiles</td></tr><tr><td><code class="ys-code">getShape()</code></td><td>-</td><td><code class="ys-code">"circle" | "square"</code></td><td>Renvoie la forme courante</td></tr><tr><td><code class="ys-code">getColumns()</code></td><td>-</td><td><code class="ys-code">number</code></td><td>Renvoie le nombre de colonnes courant</td></tr><tr><td><code class="ys-code">getSpacing()</code></td><td>-</td><td><code class="ys-code">number</code></td><td>Renvoie l'espacement courant</td></tr><tr><td><code class="ys-code">addIcon(code, title, thumbnail?, badge?, disabled?, metadata?)</code></td><td>API ergonomique orientée image</td><td><code class="ys-code">this</code></td><td>Ajoute une tuile icône (à privilégier pour IconGrid)</td></tr><tr><td><code class="ys-code">addAction(code, title, description?, thumbnail?, disabled?, metadata?)</code></td><td>ordre de base</td><td><code class="ys-code">this</code></td><td>Ajoute une action (même signature que ActionGrid ; <code class="ys-code">description</code> est ignoré au rendu)</td></tr><tr><td><code class="ys-code">addActions(actions)</code></td><td><code class="ys-code">actions[]</code></td><td><code class="ys-code">this</code></td><td>Ajoute plusieurs actions (hérité)</td></tr><tr><td><code class="ys-code">removeAction(code)</code></td><td><code class="ys-code">code</code></td><td><code class="ys-code">boolean</code></td><td>Supprime une action (hérité)</td></tr><tr><td><code class="ys-code">updateAction(code, updates)</code></td><td><code class="ys-code">code</code>, objet partiel</td><td><code class="ys-code">boolean</code></td><td>Met à jour une action (hérité)</td></tr><tr><td><code class="ys-code">hasActions()</code></td><td>-</td><td><code class="ys-code">boolean</code></td><td>Indique si la grille contient au moins une action</td></tr><tr><td><code class="ys-code">serve()</code> / <code class="ys-code">toJSON()</code></td><td>-</td><td>objet</td><td>Sérialisation et diffusion (hérité de BaseView)</td></tr></tbody></table></div>
+
+<p>(Tous les autres utilitaires d'action — <code class="ys-code">getAction</code>, <code class="ys-code">getActions</code>, <code class="ys-code">getActiveActions</code>, <code class="ys-code">sortByTitle</code>, <code class="ys-code">disableAllActions</code>, etc. — sont hérités de <code class="ys-code">BaseActionView</code>, comme pour <code class="ys-code">ActionGridView</code>.)</p>
+
+<h2 id="javascript-sample-code">Exemple de code JavaScript</h2>
+
+<h3 id="basic-icon-grid-circle-tiles">Grille d'icônes simple (tuiles circulaires)</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const iconGrid = yeriaApp
+    .createIconGridView('home', 'Accueil')
+    .setIntro('Choisissez un service')
+    .setColumns(4)
+    .addIcon('map',     'Carte',     'https://example.com/icons/map.png')
+    .addIcon('wallet',  'Portefeuille', 'https://example.com/icons/wallet.png', '3')
+    .addIcon('docs',    'Documents', 'https://example.com/icons/docs.png')
+    .addIcon('support', 'Support',   'https://example.com/icons/support.png');
+
+const response = yeriaApp.serve(iconGrid);</code></pre>
+
+<h3 id="square-tiles-a-disabled-action">Tuiles carrées + une action désactivée</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const iconGrid = yeriaApp
+    .createIconGridView('tools', 'Outils')
+    .setShape('square')
+    .setColumns(3)
+    .addIcon('scan',    'Scanner', 'scan.png')
+    .addIcon('pay',     'Payer',   'pay.png', 'New')
+    .addIcon('archive', 'Archives','archive.png', undefined, true); // disabled</code></pre>
+
+<h2 id="complete-json-example">Exemple JSON complet</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "home",
+  "type": "IconGrid",
+  "content": {
+    "title": "Accueil",
+    "intro": "Choisissez un service",
+    "shape": "circle",
+    "columns": 4,
+    "spacing": 12,
+    "actions": [
+      { "code": "map",     "title": "Carte",        "thumbnail": "https://example.com/icons/map.png" },
+      { "code": "wallet",  "title": "Portefeuille", "thumbnail": "https://example.com/icons/wallet.png", "badge": "3" },
+      { "code": "docs",    "title": "Documents",    "thumbnail": "https://example.com/icons/docs.png" },
+      { "code": "support", "title": "Support",      "thumbnail": "https://example.com/icons/support.png", "disabled": true }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2026-06-19T10:00:00.000Z"
+  }
+}</code></pre>
+
+<h2 id="signed-envelope">Enveloppe signée</h2>
+
+<p><code class="ys-code">serve()</code> encapsule la vue exactement comme n'importe quelle autre — sans traitement particulier :</p>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "payload": "{\"appId\":\"my-app\",\"timestamp\":1750329600000,\"view\":{\"id\":\"home\",\"type\":\"IconGrid\",\"content\":{ ... }}}",
+  "signature": "&lt;base64 Ed25519 signature over the payload string&gt;"
+}</code></pre>

@@ -17,6 +17,7 @@ from ..security.yeria_user_token_verifier import YeriaUserTokenVerifier, _b64url
 from ..key_store import YeriaPublicKeys
 from ...types.models import SecureNotificationResponse
 from ...errors.exceptions import ConfigurationError, ExternalError
+from ...utils.signing_json import dumps_for_signing
 
 
 def _decode_aud(token: str) -> Optional[str]:
@@ -106,8 +107,8 @@ class YeriaPlatform:
             raise ConfigurationError("rotate_key requires both privateKey and publicKey in PEM format")
 
         envelope = {"serviceId": str(service_id), "newPublicKey": pub, "timestamp": int(time.time() * 1000)}
-        # Compact separators: the backend verifies over JSON.stringify(envelope).
-        signature = self._signer.sign_payload(json.dumps(envelope, separators=(",", ":")))
+        # Same serializer as every signed byte: compact, byte-matches JS.
+        signature = self._signer.sign_payload(dumps_for_signing(envelope))
         url = f"{yeria_api_base_url.rstrip('/')}/api/v1/services/{service_id}/keys/rotate"
         try:
             res = requests.post(
@@ -145,7 +146,7 @@ class YeriaPlatform:
         return self._key_store
 
     # ── Yeria active public key ─────────────────────────────────────────
-    def get_yeria_public_key(self, timeout: int = 5) -> YeriaPublicKey:
+    def get_yeria_public_key(self, timeout: Optional[int] = None) -> YeriaPublicKey:
         """Pull Yeria's active backend signing key (RS256) from
         ``GET /api/v1/public/registry/public-key``. Cache it, then verify tokens
         locally with ``YeriaApp.verify_yeria_token``."""
@@ -155,7 +156,9 @@ class YeriaPlatform:
             raise ConfigurationError("get_yeria_public_key requires base_url in config.")
         url = self._base_url.rstrip("/") + "/api/v1/public/registry/public-key"
         try:
-            res = requests.get(url, timeout=timeout)
+            # The configured budget first, as send_notification does; a
+            # per-call `timeout` wins over it.
+            res = requests.get(url, timeout=timeout if timeout is not None else self._notification_timeout)
         except requests.RequestException as e:
             raise ExternalError(f"get_yeria_public_key request failed: {e}")
         try:
@@ -175,7 +178,7 @@ class YeriaPlatform:
         )
 
     # ── User details (token-authorized) ─────────────────────────────────
-    def fetch_user_details(self, user_service_token: str, timeout: int = 5) -> UserDetails:
+    def fetch_user_details(self, user_service_token: str, timeout: Optional[int] = None) -> UserDetails:
         """Fetch a Yeria user's details, authorized by the user's own live
         service token. The token is the only credential; the backend verifies
         the provider signature AND the token, and identifies the user by the
@@ -198,12 +201,16 @@ class YeriaPlatform:
             "timestamp": int(time.time() * 1000),
             "nonce": base64.b16encode(os.urandom(16)).decode().lower(),
         }
-        payload_str = json.dumps(envelope, separators=(",", ":"), sort_keys=False)
+        payload_str = dumps_for_signing(envelope)
         signature = self._signer.sign_payload(payload_str)
 
         url = self._base_url.rstrip("/") + f"/api/v1/provider/services/{service_id}/users/details"
         try:
-            res = requests.post(url, json={"envelope": envelope, "signature": signature}, timeout=timeout)
+            res = requests.post(
+                url,
+                json={"envelope": envelope, "signature": signature},
+                timeout=timeout if timeout is not None else self._notification_timeout,
+            )
         except requests.RequestException as e:
             raise ExternalError(f"Yeria user details fetch transport error: {e}")
 

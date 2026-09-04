@@ -1,0 +1,59 @@
+<h2 id="description">Description</h2>
+
+<p>A deep link opens your service — or one precise screen of it — from outside the app: a notification, an e-mail, a QR code, a message.</p>
+
+<p><strong>The link addresses your service, never your server.</strong> It carries the id Yeria gave your service, and the client resolves the rest: your base URL, your public keys, the country rule. That is what lets your links keep working when your infrastructure moves, and what keeps a forged link from pointing the app at a server that is not yours.</p>
+
+<h2 id="the-two-forms">The two forms</h2>
+
+<p>Both say the same thing. Use whichever the medium allows.</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Form</th><th>Use</th></tr></thead><tbody><tr><td><code class="ys-code">yeria://dl/{op}/{serviceId}</code></td><td>Inside a notification, a QR code, an app that already knows Yeria is installed.</td></tr><tr><td><code class="ys-code">https://yeria.app/dl/{op}/{serviceId}</code></td><td>Anywhere a web link is expected — an e-mail, a page, an SMS. It opens the app when it is installed.</td></tr></tbody></table></div>
+
+<h2 id="operations">Operations</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th><code class="ys-code">op</code></th><th>Opens</th></tr></thead><tbody><tr><td><code class="ys-code">s</code></td><td>Your service, at its base URL — its root view.</td></tr><tr><td><code class="ys-code">v</code></td><td>One of your views. Requires <code class="ys-code">?p=</code>, see below.</td></tr><tr><td><code class="ys-code">c</code></td><td>The conversation between the user and your service.</td></tr><tr><td><code class="ys-code">p</code></td><td>The prompt to pin your service.</td></tr><tr><td><code class="ys-code">n</code></td><td>The prompt to consent to your notifications. This is the link to put behind a "get notified" call to action.</td></tr></tbody></table></div>
+
+<h2 id="linking-to-one-of-your-views">Linking to one of your views</h2>
+
+<p><code class="ys-code">v</code> takes the path of the view on your own server, in a single <code class="ys-code">p</code> parameter:</p>
+
+<pre class="ys-codeblock" data-lang="text"><code>yeria://dl/v/{serviceId}?p=/orders/4718
+https://yeria.app/dl/v/{serviceId}?p=/orders/4718</code></pre>
+
+<p><strong>A deep entry receives its root.</strong> The client mounts the view served by your base URL first, then places the requested one on top. The user therefore lands where you pointed them, and a back gesture leads into your service instead of out of the app. You have nothing to declare for this: it is how the client enters, always.</p>
+
+<h2 id="build-them-with-the-sdk">Build them with the SDK</h2>
+
+<p><code class="ys-code">YeriaLink</code> writes these links for you, and refuses to write a broken one. A service id outside the accepted set, or a path that would escape your service, throws where you build it — rather than producing a string that silently opens nothing on someone's phone.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaLink } from '@numerum-tech/yeriasdk';
+
+YeriaLink.service('svc_4718');                       // your service
+YeriaLink.component('svc_4718', '/orders/4718');     // one of your views
+YeriaLink.chat('svc_4718');                          // the conversation
+YeriaLink.pin('svc_4718');                           // the pin prompt
+YeriaLink.subscribe('svc_4718');                     // the notification consent
+
+// https://yeria.app/dl/s/svc_4718</code></pre>
+
+<p>HTTPS is the default, because it works on a web page as well as on a device with Yeria installed. Ask for the custom scheme where you already know it is:</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>YeriaLink.service('svc_4718', { format: 'yeria' });
+// yeria://dl/s/svc_4718</code></pre>
+
+<p><code class="ys-code">YeriaLink.isValid(link)</code> answers whether a link is one Yeria will honour — useful when a link reaches you from somewhere you do not control.</p>
+
+<p>The Python SDK carries the same class, with the same five builders and the same validation.</p>
+
+<h2 id="what-the-client-refuses">What the client refuses</h2>
+
+<p>An external link is untrusted input. The client drops anything it cannot vouch for, silently — a refused link opens nothing rather than opening the wrong thing.</p>
+
+<ul><li>A host other than <code class="ys-code">dl</code>, or a domain other than <code class="ys-code">yeria.app</code>. Nothing else is a Yeria link.</li><li>A service id outside <code class="ys-code">A-Z a-z 0-9 . _ ~ -</code>, or longer than 128 characters.</li><li>Any query parameter other than the single <code class="ys-code">p</code> of a <code class="ys-code">v</code> link, or a fragment.</li><li>A <code class="ys-code">p</code> that is not a path on your server: an absolute URL, a protocol-relative one, a backslash, or a <code class="ys-code">..</code> segment. A link may reach into your service; it may not reach out of it.</li><li>A port, or credentials in the URL.</li></ul>
+
+<h2 id="before-the-user-is-signed-in">Before the user is signed in</h2>
+
+<p>A link received while nobody is signed in is not lost: it is held, and honoured once the session is open. Your call to action works on a first install as it does on the tenth launch.</p>
+
+<p>A service outside the user's country asks for confirmation before opening. If the user declines, nothing opens — plan for the case where your link does not lead where you expected.</p>

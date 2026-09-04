@@ -7,6 +7,7 @@ import { YeriaEnvelopeVerifier } from './security/yeria-envelope-verifier';
 import { YeriaUserTokenVerifier } from './security/yeria-user-token-verifier';
 import { YeriaPlatform } from './platform/yeria-platform-client';
 import { buildProviderError, ProviderErrorSpec } from './provider-error';
+import { stringifyForSigning } from '../utils/signing-json';
 
 // Types for the secure configuration
 export interface YeriaAppConfig {
@@ -94,7 +95,7 @@ export class YeriaApp {
             timestamp: Date.now(),
             ...buildProviderError(spec),
         };
-        const payload = JSON.stringify(decoded);
+        const payload = stringifyForSigning(decoded);
         return { payload, signature: this.signer.signPayload(payload) };
     }
 
@@ -158,6 +159,7 @@ export class YeriaApp {
     async fetchUserDetails(opts: {
         userServiceToken: string;
         fetch?: typeof fetch;
+        timeoutMs?: number;
     }): Promise<UserDetails> {
         return this.platform.fetchUserDetails(opts);
     }

@@ -1,14 +1,19 @@
-# Yeria SDK Component Specifications
+# Yeria SDK Specifications
 
-This directory contains detailed specifications for all components in the Yeria SDK JavaScript implementation. Each specification document includes:
+Reference for the Yeria SDK, available for **JavaScript/TypeScript**
+(`@numerum-tech/yeriasdk`) and **Python** (`yeriasdk`). Both implementations
+sign byte-identically, so a view built in one verifies in the other.
+
+Each component specification includes:
 
 - **Component Description**: Purpose, use cases, and design principles
 - **Fields Description Table**: Complete field reference with types, requirements, and descriptions
-- **JavaScript Sample Code**: Practical examples demonstrating component usage
+- **Sample Code**: Practical examples demonstrating component usage
 
-## Main Class
+## Start here
 
-- **[YeriaApp](yeria-app.md)** - Main entry point for creating secure, signed views with Ed25519 signature generation and verification
+- **[Provider integration](provider-integration.md)** — end to end: generate your Ed25519 keypair, register it, verify inbound user tokens, fetch user profiles. Read this first.
+- **[YeriaUI & YeriaApp](yeria-app.md)** — the two SDK entry points. `YeriaUI` builds views (keyless); `YeriaApp` holds your key and signs.
 
 ## View Components
 
@@ -36,6 +41,8 @@ This directory contains detailed specifications for all components in the Yeria 
 
 - **[ActionGridView](action-grid-view.md)** - Grid layout of action items for dashboards or icon-based navigation. Supports configurable columns (1-6) and spacing.
 
+- **[IconGridView](icon-grid-view.md)** - Compact icon grid for dense, icon-first navigation.
+
 ### QR Code Components
 
 - **[QRScanView](qr-scan-view.md)** - QR code scanner interface. Mobile app handles scanner implementation while view describes what to scan and where to submit. Supports auto-submit, validation, and preview modes.
@@ -45,6 +52,13 @@ This directory contains detailed specifications for all components in the Yeria 
 ### Message Components
 
 - **[MessageView](message-view.md)** - Message, notification, and alert display component. Supports different severity levels (info, success, warning, error) with primary and secondary actions. Can be dismissible or require user interaction.
+
+### Header Text
+
+Every view carries a short line of context under its title, set with `setIntro(text)` and carried by the `intro` key. CardView adds `setDescription(text)` for its long-form body paragraph, which is a different role. On CardView and CarouselView the key used to be named `subtitle`: `setSubtitle(text)` is kept as an alias of `setIntro` and writes the same key. All header texts share one contract:
+
+- The text is trimmed, and an empty or blank value is refused with an `InvalidParameterError`. A header line is set or it does not exist — there is no "empty" state.
+- A setter you never call emits no key at all. The client draws nothing for a key it does not receive, so an unset intro costs no vertical space.
 
 ## Usage
 
@@ -56,23 +70,44 @@ Each specification document provides:
 
 ## Quick Start
 
-```javascript
-import { YeriaApp } from '@numerum-tech/yeriasdk';
+Building a view needs no key; signing it does. That is why the two steps sit on
+two different objects.
 
-// Initialize YeriaApp
-const yeriaApp = new YeriaApp({
+```javascript
+import { YeriaUI, YeriaApp } from '@numerum-tech/yeriasdk';
+
+// Holds your Ed25519 private key — signs, verifies, talks to Yeria.
+const app = new YeriaApp({
     appId: 'my-app',
-    viewExpirationMinutes: 30
+    baseUrl: process.env.YERIA_BASE_URL,
+    privateKey: process.env.SERVICE_ED25519_PRIVATE_KEY,
 });
 
-// Create a view (example: FormView)
-const form = yeriaApp
-    .createFormView('registration', 'User Registration')
+// Keyless factory — never instantiated, used like Math or JSON.
+const form = YeriaUI.createFormView('registration', 'User Registration')
     .addTextField('name', 'Name', true)
     .submitButton('Register', 'POST');
 
-// Serve the view (generates secure signature)
-const response = yeriaApp.serve(form);
+// Sign it into a v3 envelope: { payload, signature }
+res.json(app.serve(form));
+```
+
+Python, same protocol:
+
+```python
+from yeriasdk import YeriaApp, YeriaAppConfig, YeriaUI
+
+app = YeriaApp(YeriaAppConfig(
+    app_id="my-app",
+    base_url=os.environ["YERIA_BASE_URL"],
+    private_key=os.environ["SERVICE_ED25519_PRIVATE_KEY"],
+))
+
+form = (YeriaUI.create_form_view("registration", "User Registration")
+        .add_text_field("name", "Name", True)
+        .submit_button("Register", "POST"))
+
+envelope = app.serve(form)
 ```
 
 For detailed information about each component, refer to the individual specification documents listed above.

@@ -5,7 +5,7 @@
 The `CardView` component is a compact "product sheet" view that highlights a single item with stats, sections, and actions. It's ideal for displaying product information, user profiles, event details, or any single entity that needs rich presentation.
 
 The card includes:
-- Title and subtitle
+- Title and intro
 - Description
 - Badge (optional)
 - Hero image (optional)
@@ -22,12 +22,13 @@ The card includes:
 | `type` | `string` | Yes | Always `"Card"` |
 | `content` | `CardContent` | Yes | Card content object |
 | `content.title` | `string` | Yes | Card title (set in constructor) |
-| `content.subtitle` | `string` | No | Subtitle displayed under title |
+| `content.intro` | `string` | No | Line of context under the title — same role as `intro` on every other view. Formerly named `subtitle`. |
 | `content.description` | `string` | No | Long-form description |
 | `content.badge` | `string` | No | Badge text (e.g., "New", "Popular") |
 | `content.image` | `CardImage` | No | Hero image |
 | `content.image.url` | `string` | Yes* | Image URL (required if image is set) |
 | `content.image.alt` | `string` | No | Alt text for image |
+| `content.statsHeading` | `string` | No | Heading of the stats block. Absent means no heading — the client draws no title of its own. |
 | `content.stats` | `CardStat[]` | No | Array of key-value statistics |
 | `content.stats[].label` | `string` | Yes | Stat label |
 | `content.stats[].value` | `string` | Yes | Stat value |
@@ -51,11 +52,13 @@ The card includes:
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `setSubtitle(subtitle)` | `subtitle` - Subtitle text | `this` | Sets the subtitle displayed under the main title |
+| `setIntro(intro)` | `intro` - Introduction text | `this` | Sets the line of context displayed under the main title. Refuses a blank value |
+| `setSubtitle(subtitle)` | `subtitle` - Introduction text | `this` | Historical name of `setIntro`, kept. Writes the same key |
 | `setDescription(description)` | `description` - Description text | `this` | Sets the long-form description for the card body |
 | `setBadge(badge)` | `badge` - Badge text or undefined | `this` | Sets a badge displayed above the title |
 | `setImage(url, alt?)` | `url` - Image URL<br>`alt` - Alt text | `this` | Sets the hero image for the card |
 | `clearImage()` | - | `this` | Removes the card image |
+| `setStatsHeading(heading)` | `heading` - Heading text | `this` | Names the stats block. Optional; refuses a blank value |
 | `addStat(label, value)` | `label` - Stat label<br>`value` - Stat value | `this` | Adds a key-value statistic |
 | `clearStats()` | - | `this` | Removes all statistics |
 | `addSection(heading, body)` | `heading` - Section heading<br>`body` - Section body text | `this` | Adds a descriptive section |
@@ -68,8 +71,10 @@ The card includes:
 | `toJSON()` | - | `Record<string, unknown>` | Returns JSON representation (inherited from BaseView) |
 | `setState(key, value)` | `key` - State key<br>`value` - State value | `void` | Sets view state (inherited from BaseView) |
 | `getState(key)` | `key` - State key | `unknown` | Gets view state (inherited from BaseView) |
-| `setNext(url)` | `url` - Next view URL | `this` | Sets next view navigation (inherited from BaseView) |
-| `setPrev(url)` | `url` - Previous view URL | `this` | Sets previous view navigation (inherited from BaseView) |
+| `setNext(url)` | `url` - URL or path of the next view | `this` | Forward control of a paginated sequence, drawn by the client — see the Navigation reference on the docs site |
+| `setPrev(url)` | `url` - URL or path of the previous view | `this` | Backward control of the same sequence. NOT where the back gesture leads — see the Navigation reference on the docs site |
+| `setEntry(entry)` | `entry` - `'push'`, `'replace'`, or an integer <= 1 | `this` | How this view enters the client's navigation stack (default: `push`) — see the Navigation reference on the docs site |
+| `setPage(current, total?)` | `current` - 1-based position<br>`total` - sequence length, when known | `this` | Where this view sits in its sequence; the client draws the indicator — see the Navigation reference on the docs site |
 | `setProcess(processId, context?)` | `processId` - Process ID<br>`context` - Process context | `this` | Sets process context (inherited from BaseView) |
 
 ## JavaScript Sample Code
@@ -83,7 +88,7 @@ const yeriaApp = new YeriaApp({ appId: 'my-app' });
 
 const card = yeriaApp
     .createCardView('product-card', 'Super Gadget')
-    .setSubtitle('Boost your day')
+    .setIntro('Boost your day')
     .setDescription('A compact companion to organize your tasks and automate your daily routines.')
     .addStat('Price', '49 €')
     .addSection('Key Points', 'Voice assistant, 48h battery life, multi-device sync.')
@@ -97,7 +102,7 @@ const response = yeriaApp.serve(card);
 ```javascript
 const card = yeriaApp
     .createCardView('product', 'Product Name')
-    .setSubtitle('Product Category')
+    .setIntro('Product Category')
     .setDescription('Product description goes here.')
     .setImage('https://example.com/product.jpg', 'Product Image')
     .addStat('Price', '$99')
@@ -111,7 +116,7 @@ const card = yeriaApp
 const card = yeriaApp
     .createCardView('featured-product', 'Featured Product')
     .setBadge('New')
-    .setSubtitle('Limited Edition')
+    .setIntro('Limited Edition')
     .setDescription('Exclusive product available for a limited time.')
     .setImage('https://example.com/product.jpg', 'Product')
     .addStat('Price', '$199')
@@ -124,7 +129,7 @@ const card = yeriaApp
 ```javascript
 const card = yeriaApp
     .createCardView('user-profile', 'John Doe')
-    .setSubtitle('Premium Member')
+    .setIntro('Premium Member')
     .setDescription('Active user since 2020')
     .addStat('Posts', '125')
     .addStat('Followers', '1.2K')
@@ -138,7 +143,7 @@ const card = yeriaApp
 ```javascript
 const card = yeriaApp
     .createCardView('event', 'Tech Conference 2025')
-    .setSubtitle('March 15-17, 2025')
+    .setIntro('March 15-17, 2025')
     .setDescription('Join us for the biggest tech conference of the year.')
     .addStat('Date', 'March 15-17')
     .addStat('Location', 'San Francisco')
@@ -246,7 +251,7 @@ const card = yeriaApp
 const card = yeriaApp
     .createCardView('product-detail', 'Premium Headphones')
     .setBadge('Best Seller')
-    .setSubtitle('Wireless Audio')
+    .setIntro('Wireless Audio')
     .setDescription('High-quality wireless headphones with noise cancellation and 30-hour battery life.')
     .setImage('https://example.com/headphones.jpg', 'Premium Headphones')
     .addStat('Price', '$299')
@@ -274,7 +279,7 @@ const card = yeriaApp
   "content": {
     "title": "Premium Headphones",
     "badge": "Best Seller",
-    "subtitle": "Wireless Audio",
+    "intro": "Wireless Audio",
     "description": "High-quality wireless headphones with noise cancellation and 30-hour battery life.",
     "image": {
       "url": "https://example.com/headphones.jpg",

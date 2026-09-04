@@ -47,7 +47,6 @@ export class IconGridView extends BaseActionView {
 
         this.content = {
             title: title,
-            intro: '',
             shape: 'circle',
             columns: 4,
             spacing: 12,

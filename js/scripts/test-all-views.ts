@@ -171,7 +171,7 @@ try {
     // 8. Test CardView
     console.log('\n🎯 Test 9: CardView');
     const cardView = new CardView('product-card', 'Super Gadget')
-        .setSubtitle('Boostez votre journée')
+        .setIntro('Boostez votre journée')
         .setDescription('Un compagnon compact pour organiser vos tâches et automatiser vos routines quotidiennes.')
         .setImage('https://cdn.example.com/gadget.jpg', 'Super Gadget')
         .addStat('Prix', '49 €')

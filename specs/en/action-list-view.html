@@ -1,0 +1,192 @@
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">ActionListView</code> component displays a vertical list of action items. Each action can have a title, description, thumbnail image, and optional metadata. Actions are typically used for navigation menus, feature lists, or command centers.</p>
+
+<p>When an action is selected, the mobile app POSTs the action code to <code class="ys-code">{service.baseUrl}/{viewId}</code> with the action code in the request body.</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the action list view</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Always <code class="ys-code">"ActionList"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">ActionListContent</code></td><td>Yes</td><td>Action list content object</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional title displayed above the action list</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional introduction text displayed before the action list</td></tr><tr><td><code class="ys-code">content.actions</code></td><td><code class="ys-code">ActionConfig[]</code></td><td>Yes</td><td>Array of actions (at least one required)</td></tr><tr><td><code class="ys-code">content.actions[].code</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique action code (used in submission)</td></tr><tr><td><code class="ys-code">content.actions[].title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Action title displayed to user</td></tr><tr><td><code class="ys-code">content.actions[].desc</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional description/subtitle</td></tr><tr><td><code class="ys-code">content.actions[].thumbnail</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional thumbnail image URL</td></tr><tr><td><code class="ys-code">content.actions[].disabled</code></td><td><code class="ys-code">boolean</code></td><td>No</td><td>Whether the action is disabled (default: false)</td></tr><tr><td><code class="ys-code">content.actions[].metadata</code></td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>No</td><td>Optional metadata for the action</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Process identifier for multi-step workflows</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>No</td><td>View metadata (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setTitle(title)</code></td><td><code class="ys-code">title</code> - Title text</td><td><code class="ys-code">this</code></td><td>Sets the title displayed above the action list</td></tr><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Introduction text</td><td><code class="ys-code">this</code></td><td>Sets the introduction text displayed before the action list</td></tr><tr><td><code class="ys-code">addAction(code, title, description?, thumbnail?, disabled?, metadata?)</code></td><td><code class="ys-code">code</code> - Action code<br><code class="ys-code">title</code> - Action title<br><code class="ys-code">description</code> - Optional description<br><code class="ys-code">thumbnail</code> - Optional image URL<br><code class="ys-code">disabled</code> - Disabled flag<br><code class="ys-code">metadata</code> - Optional metadata</td><td><code class="ys-code">this</code></td><td>Adds an action to the list</td></tr><tr><td><code class="ys-code">addActions(actions)</code></td><td><code class="ys-code">actions</code> - Array of action objects</td><td><code class="ys-code">this</code></td><td>Adds multiple actions at once</td></tr><tr><td><code class="ys-code">removeAction(actionCode)</code></td><td><code class="ys-code">actionCode</code> - Action code to remove</td><td><code class="ys-code">boolean</code></td><td>Removes an action by code</td></tr><tr><td><code class="ys-code">updateAction(actionCode, updates)</code></td><td><code class="ys-code">actionCode</code> - Action code<br><code class="ys-code">updates</code> - Partial action updates</td><td><code class="ys-code">boolean</code></td><td>Updates an existing action</td></tr><tr><td><code class="ys-code">getAction(actionCode)</code></td><td><code class="ys-code">actionCode</code> - Action code</td><td><code class="ys-code">ActionConfig | undefined</code></td><td>Gets an action by code (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">getActions()</code></td><td>-</td><td><code class="ys-code">ActionConfig[]</code></td><td>Gets all actions (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">getActiveActions()</code></td><td>-</td><td><code class="ys-code">ActionConfig[]</code></td><td>Gets only active (non-disabled) actions (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">getActionCount()</code></td><td>-</td><td><code class="ys-code">number</code></td><td>Gets the number of actions (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">hasAction(actionCode)</code></td><td><code class="ys-code">actionCode</code> - Action code</td><td><code class="ys-code">boolean</code></td><td>Checks if action exists (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">hasActions()</code></td><td>-</td><td><code class="ys-code">boolean</code></td><td>Checks if the list has any actions</td></tr><tr><td><code class="ys-code">filterActions(predicate)</code></td><td><code class="ys-code">predicate</code> - Filter function</td><td><code class="ys-code">ActionConfig[]</code></td><td>Filters actions by predicate (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">sortActions(compareFn)</code></td><td><code class="ys-code">compareFn</code> - Comparison function</td><td><code class="ys-code">this</code></td><td>Sorts actions by custom function (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">sortByTitle(ascending?)</code></td><td><code class="ys-code">ascending</code> - Sort order (default: true)</td><td><code class="ys-code">this</code></td><td>Sorts actions alphabetically by title (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">disableAllActions()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Disables all actions (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">enableAllActions()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Enables all actions (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">clearActions()</code></td><td>-</td><td><code class="ys-code">void</code></td><td>Removes all actions (inherited from BaseActionView)</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Serves the view with validation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Returns JSON representation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - State key<br><code class="ys-code">value</code> - State value</td><td><code class="ys-code">void</code></td><td>Sets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - State key</td><td><code class="ys-code">unknown</code></td><td>Gets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL or path of the next view</td><td><code class="ys-code">this</code></td><td>Forward control of a paginated sequence, drawn by the client — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL or path of the previous view</td><td><code class="ys-code">this</code></td><td>Backward control of the same sequence. NOT where the back gesture leads — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, or an integer &lt;= 1</td><td><code class="ys-code">this</code></td><td>How this view enters the client's navigation stack (default: <code class="ys-code">push</code>) — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - 1-based position<br><code class="ys-code">total</code> - sequence length, when known</td><td><code class="ys-code">this</code></td><td>Where this view sits in its sequence; the client draws the indicator — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Process ID<br><code class="ys-code">context</code> - Process context</td><td><code class="ys-code">this</code></td><td>Sets process context (inherited from BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">JavaScript Sample Code</h2>
+
+<h3 id="basic-action-list">Basic Action List</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const actionList = yeriaApp
+    .createActionListView('main-menu', 'Main Menu')
+    .setIntro('Select an option from the menu below')
+    .addAction('profile', 'My Profile', 'View your personal information', 'profile-icon.png')
+    .addAction('settings', 'Settings', 'Configure the application', 'settings-icon.png')
+    .addAction('support', 'Support', 'Contact us', 'support-icon.png');
+
+const response = yeriaApp.serve(actionList);</code></pre>
+
+<h3 id="action-list-with-metadata">Action List with Metadata</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionList = yeriaApp
+    .createActionListView('dashboard', 'Dashboard')
+    .addAction(
+        'analytics',
+        'Analytics',
+        'View your statistics',
+        'analytics.png',
+        false,
+        { badge: 'New', category: 'reports' }
+    )
+    .addAction(
+        'reports',
+        'Reports',
+        'Generate PDF reports',
+        'reports.png',
+        false,
+        { category: 'reports' }
+    )
+    .addAction(
+        'users',
+        'Users',
+        'Manage access',
+        'users.png',
+        false,
+        { category: 'administration' }
+    );</code></pre>
+
+<h3 id="action-list-with-disabled-actions">Action List with Disabled Actions</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionList = yeriaApp
+    .createActionListView('features', 'Features')
+    .addAction('feature-1', 'Feature 1', 'Available feature')
+    .addAction('feature-2', 'Feature 2', 'Coming soon', undefined, true)
+    .addAction('feature-3', 'Feature 3', 'Available feature');</code></pre>
+
+<h3 id="dynamic-action-list-management">Dynamic Action List Management</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionList = yeriaApp
+    .createActionListView('menu', 'Menu')
+    .addAction('item-1', 'Item 1', 'Description 1')
+    .addAction('item-2', 'Item 2', 'Description 2')
+    .addAction('item-3', 'Item 3', 'Description 3');
+
+// Update an action
+actionList.updateAction('item-2', {
+    title: 'Updated Item 2',
+    desc: 'Updated description',
+    disabled: true
+});
+
+// Remove an action
+actionList.removeAction('item-3');
+
+// Get actions
+const actions = actionList.getActions();
+const activeActions = actionList.getActiveActions();</code></pre>
+
+<h3 id="action-list-with-multiple-actions">Action List with Multiple Actions</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionList = yeriaApp
+    .createActionListView('services', 'Our Services')
+    .addActions([
+        {
+            code: 'service-1',
+            title: 'Service 1',
+            description: 'Description of service 1',
+            thumbnail: 'service1.png'
+        },
+        {
+            code: 'service-2',
+            title: 'Service 2',
+            description: 'Description of service 2',
+            thumbnail: 'service2.png'
+        },
+        {
+            code: 'service-3',
+            title: 'Service 3',
+            description: 'Description of service 3',
+            thumbnail: 'service3.png'
+        }
+    ]);</code></pre>
+
+<h3 id="action-list-in-process-workflow">Action List in Process Workflow</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionList = yeriaApp
+    .createActionListView('onboarding-menu', 'Get Started')
+    .setProcess('onboarding', {
+        processName: 'User Onboarding',
+        currentStep: 1,
+        totalSteps: 3
+    })
+    .addAction('step-1', 'Complete Profile', 'Fill in your personal information')
+    .addAction('step-2', 'Verify Email', 'Confirm your email address')
+    .addAction('step-3', 'Set Preferences', 'Customize your experience');</code></pre>
+
+<h3 id="sorted-action-list">Sorted Action List</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const actionList = yeriaApp
+    .createActionListView('alphabetical-menu', 'Menu')
+    .addAction('zebra', 'Zebra', 'Z item')
+    .addAction('apple', 'Apple', 'A item')
+    .addAction('banana', 'Banana', 'B item')
+    .sortByTitle(true);  // Sort alphabetically</code></pre>
+
+<h2 id="complete-json-example">Complete JSON Example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "main-menu",
+  "type": "ActionList",
+  "content": {
+    "title": "Main Menu",
+    "intro": "Select an option from the menu below",
+    "actions": [
+      {
+        "code": "profile",
+        "title": "My Profile",
+        "desc": "View your personal information",
+        "thumbnail": "https://example.com/icons/profile.png",
+        "disabled": false,
+        "metadata": {
+          "category": "account"
+        }
+      },
+      {
+        "code": "settings",
+        "title": "Settings",
+        "desc": "Configure the application",
+        "thumbnail": "https://example.com/icons/settings.png",
+        "disabled": false,
+        "metadata": {
+          "category": "preferences"
+        }
+      },
+      {
+        "code": "support",
+        "title": "Support",
+        "desc": "Contact us for help",
+        "thumbnail": "https://example.com/icons/support.png",
+        "disabled": false,
+        "metadata": {
+          "category": "help"
+        }
+      }
+    ]
+  },
+  "process": {
+    "processId": "onboarding",
+    "processName": "User Onboarding",
+    "currentStep": 1,
+    "totalSteps": 3,
+    "stepName": "Main Menu",
+    "canGoBack": false,
+    "canSkip": false
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

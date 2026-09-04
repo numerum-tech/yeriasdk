@@ -1,0 +1,125 @@
+<p>Un endpoint HTTP, une vue, un test dans l'application. Cette page suit le chemin le plus court ; les détails du protocole sont dans <a href="/docs/integration">Intégration provider</a>.</p>
+
+<p>Ce dont vous avez besoin : un backend joignable en HTTPS depuis un téléphone, Node 18+ ou Python 3.10+, et un compte Yeria.</p>
+
+<h2 id="cles">1. Générer votre paire de clés</h2>
+
+<p>La clé privée signe les vues que vous renvoyez. Elle ne quitte jamais votre serveur.</p>
+
+<pre class="ys-codeblock" data-lang="bash"><code>openssl genpkey -algorithm ed25519 -out service_private.pem
+openssl pkey -in service_private.pem -pubout -out service_public.pem</code></pre>
+
+<p>L'algorithme doit être Ed25519. Le registre refuse toute autre clé.</p>
+
+<h2 id="declarer">2. Déclarer le service</h2>
+
+<p>Dans l'espace fournisseur, créez le service, renseignez son URL de base, et collez le contenu de <code class="ys-code">service_public.pem</code> dans le champ clé publique.</p>
+
+<p>Notez l'identifiant du service : il sert à épingler l'audience des jetons utilisateurs que vous recevrez.</p>
+
+<h2 id="installer">3. Installer le SDK</h2>
+
+<p>Le paquet porte un nom différent dans chaque langage, mais la même version du protocole : <code class="ys-code">@numerum-tech/yeriasdk</code> pour Node, <code class="ys-code">yeriasdk</code> pour Python.</p>
+
+<div class="ys-codegroup" data-codegroup>
+    <div class="ys-codegroup-bar" role="tablist">
+        <button class="ys-codetab" role="tab" data-lang="js" aria-selected="true">JavaScript</button>
+        <button class="ys-codetab" role="tab" data-lang="py" aria-selected="false">Python</button>
+        <div class="ys-codegroup-meta"><button class="ys-copy" data-copy type="button" title="Copier" aria-label="Copier"><i class="bi bi-clipboard" aria-hidden="true"></i></button></div>
+    </div>
+    <pre class="ys-codeblock" data-panel="js"><code>npm i @numerum-tech/yeriasdk</code></pre>
+    <pre class="ys-codeblock" data-panel="py" hidden><code>pip install yeriasdk</code></pre>
+</div>
+
+<p>Aucune dépendance native : l'installation ne compile rien. La signature Ed25519 s'appuie sur la bibliothèque standard des deux plateformes.</p>
+
+<h2 id="configurer">4. Configurer le backend</h2>
+
+<pre class="ys-codeblock" data-lang="bash"><code>YERIA_BASE_URL=https://yeria.app
+YERIA_APP_ID=votre-application
+YERIA_SERVICE_ID=votre-service
+SERVICE_ED25519_PRIVATE_KEY="$(cat service_private.pem)"</code></pre>
+
+<h2 id="vue">5. Renvoyer une vue</h2>
+
+<p>Le SDK sépare deux responsabilités : <code class="ys-code">YeriaUI</code> construit la vue et ne détient aucune clé ; <code class="ys-code">YeriaApp</code> détient la clé, signe la vue et vérifie les jetons entrants.</p>
+
+<div class="ys-codegroup" data-codegroup>
+    <div class="ys-codegroup-bar" role="tablist">
+        <button class="ys-codetab" role="tab" data-lang="js" aria-selected="true">JavaScript</button>
+        <button class="ys-codetab" role="tab" data-lang="py" aria-selected="false">Python</button>
+        <div class="ys-codegroup-meta"><button class="ys-copy" data-copy title="Copier" aria-label="Copier"><i class="bi bi-clipboard" aria-hidden="true"></i></button></div>
+    </div>
+    <pre class="ys-codeblock" data-panel="js"><code>import express from 'express';
+import { YeriaUI, YeriaApp } from '@numerum-tech/yeriasdk';
+
+const app = new YeriaApp({
+  appId: process.env.YERIA_APP_ID,
+  baseUrl: process.env.YERIA_BASE_URL,
+  privateKey: process.env.SERVICE_ED25519_PRIVATE_KEY,
+});
+
+const server = express();
+
+server.get('/recharge', (req, res) =&gt; {
+  const view = YeriaUI.createFormView('recharge', 'Recharge de compte')
+    .setIntro('Service vérifié · paiement direct')
+    .addPhoneField('msisdn', 'Numéro', true)
+    .addNumberField('amount', 'Montant (FCFA)', true)
+    .submitButton('Payer', 'POST');
+
+  res.json(app.serve(view));
+});
+
+server.listen(8080);</code></pre>
+    <pre class="ys-codeblock" data-panel="py" hidden><code>import os
+from fastapi import FastAPI
+from yeriasdk import YeriaUI, YeriaApp, YeriaAppConfig
+
+app = YeriaApp(YeriaAppConfig(
+    app_id=os.environ["YERIA_APP_ID"],
+    base_url=os.environ["YERIA_BASE_URL"],
+    private_key=os.environ["SERVICE_ED25519_PRIVATE_KEY"],
+))
+
+server = FastAPI()
+
+@server.get("/recharge")
+def recharge():
+    view = (
+        YeriaUI.create_form_view("recharge", "Recharge de compte")
+        .set_intro("Service vérifié · paiement direct")
+        .add_phone_field("msisdn", "Numéro", True)
+        .add_number_field("amount", "Montant (FCFA)", True)
+        .submit_button("Payer", "POST")
+    )
+    return app.serve(view)</code></pre>
+</div>
+
+<p><code class="ys-code">serve()</code> renvoie l'enveloppe <code class="ys-code">{ payload, signature }</code>. L'application vérifie la signature avec votre clé publique avant de rendre l'écran ; une vue non vérifiable est refusée.</p>
+
+<h2 id="jeton">6. Vérifier le jeton utilisateur</h2>
+
+<p>L'application appelle votre endpoint avec un jeton porteur émis par Yeria pour votre service. Vous le vérifiez vous-même : le SDK fournit des helpers, pas de middleware.</p>
+
+<pre class="ys-codeblock" data-lang="js"><code>const auth = req.headers.authorization || '';
+const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';
+const user = await app.verifyUserToken(bearer, process.env.YERIA_SERVICE_ID);</code></pre>
+
+<p>La clé de signature de la plateforme est récupérée une fois puis mise en cache : les vérifications suivantes ne font aucun appel réseau.</p>
+
+<h2 id="tester">7. Tester</h2>
+
+<p><strong>Votre service n'est pas encore au catalogue.</strong> Tant qu'il n'est pas passé par la revue Yeria — et chaque fois qu'il est dépublié — il n'apparaît ni dans la recherche ni dans les listes publiques. Vous le trouverez dans l'application sous <em>Mes services privés</em>, et nulle part ailleurs.</p>
+
+<p><strong>Vous devez vous y inviter vous-même.</strong> Cette section liste les services auxquels on vous a donné accès : ouvrez donc votre service dans l'espace fournisseur, allez à l'onglet <em>Accès</em>, et invitez le compte que vous utilisez dans l'application. L'invitation arrive dans l'application, vous l'acceptez, et le service apparaît dans votre liste privée, avec la vue que sert votre backend.</p>
+
+<p>Ouvrez votre service depuis l'application Yeria. L'écran décrit à l'étape 4 apparaît en rendu natif. Modifiez la vue, redéployez votre backend, rouvrez le service : l'écran a changé, sans passer par un store.</p>
+
+<h2 id="ensuite">Ensuite</h2>
+
+<ul>
+    <li><a href="/docs/integration">Intégration provider</a> — rotation de clés, profils utilisateurs, gestion des erreurs.</li>
+    <li><a href="/docs/formview">FormView</a> — tous les types de champs et leurs validations.</li>
+    <li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a> — la répartition exacte des responsabilités.</li>
+</ul>

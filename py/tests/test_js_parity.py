@@ -63,3 +63,22 @@ def test_notification_signature_matches_js(app, vector):
     note = Notification("u1", "Title", "Body")
     signed = app._signer.sign_notification(note, vector["appId"], vector["timestamp"])
     assert signed.signature == vector["noteSignature"]
+
+
+def test_accented_notification_signature_matches_js(app, vector):
+    """Le backend reconstruit la charge utile d'une notification avec
+    `JSON.stringify` avant d'en verifier la signature : un titre en francais
+    signe par Python doit produire les memes octets que JS. `json.dumps`
+    echappait le non-ASCII, donc la verification echouait."""
+    note = Notification("u1", "Réservation confirmée ☕", "Votre créneau du 5 à 9 h — merci !")
+    signed = app._signer.sign_notification(note, vector["appId"], vector["timestamp"])
+    assert signed.signature == vector["noteAccentSignature"]
+
+
+def test_boundary_float_payload_bytes_match_js(app, vector):
+    """`1.0`, `1e-7`, `1e21`, `-0.0` : Python les ecrivait `1.0`, `1e-07`,
+    `1e+21`, `-0.0` la ou JS ecrit `1`, `1e-7`, `1e+21`, `0`. Une latitude
+    ronde suffisait a faire diverger la signature des deux SDK."""
+    env = app._signer.sign_view(vector["floatViewJson"], vector["appId"], vector["timestamp"])
+    assert env.payload == vector["floatPayload"]
+    assert env.signature == vector["floatSignature"]

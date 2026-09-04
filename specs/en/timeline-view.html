@@ -1,0 +1,191 @@
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">TimelineView</code> component captures chronological progress such as onboarding steps, activity feeds, or process tracking. It displays a series of events in chronological order with status indicators (pending, active, completed, error).</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the timeline view</td></tr><tr><td><code class="ys-code">type</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Always <code class="ys-code">"Timeline"</code></td></tr><tr><td><code class="ys-code">content</code></td><td><code class="ys-code">TimelineContent</code></td><td>Yes</td><td>Timeline content object</td></tr><tr><td><code class="ys-code">content.title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Timeline title</td></tr><tr><td><code class="ys-code">content.intro</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Introduction text displayed before timeline items</td></tr><tr><td><code class="ys-code">content.items</code></td><td><code class="ys-code">TimelineItem[]</code></td><td>Yes</td><td>Array of timeline items (at least one required)</td></tr><tr><td><code class="ys-code">content.items[].id</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the timeline item</td></tr><tr><td><code class="ys-code">content.items[].title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Item title</td></tr><tr><td><code class="ys-code">content.items[].timestamp</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Timestamp (ISO 8601 format recommended)</td></tr><tr><td><code class="ys-code">content.items[].description</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional description</td></tr><tr><td><code class="ys-code">content.items[].status</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Status: <code class="ys-code">"pending"</code>, <code class="ys-code">"active"</code>, <code class="ys-code">"completed"</code>, <code class="ys-code">"error"</code></td></tr><tr><td><code class="ys-code">content.items[].icon</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional icon identifier</td></tr><tr><td><code class="ys-code">content.items[].meta</code></td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>No</td><td>Optional metadata</td></tr><tr><td><code class="ys-code">processId</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Process identifier for multi-step workflows</td></tr><tr><td><code class="ys-code">metadata</code></td><td><code class="ys-code">object</code></td><td>No</td><td>View metadata (version, createdAt, author, tags)</td></tr></tbody></table></div>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">setIntro(intro)</code></td><td><code class="ys-code">intro</code> - Introduction text</td><td><code class="ys-code">this</code></td><td>Sets the introduction text displayed before timeline items</td></tr><tr><td><code class="ys-code">addItem(item)</code></td><td><code class="ys-code">item</code> - TimelineItem object</td><td><code class="ys-code">this</code></td><td>Adds a fully configured timeline entry</td></tr><tr><td><code class="ys-code">addEvent(id, title, timestamp, options?)</code></td><td><code class="ys-code">id</code> - Event ID<br><code class="ys-code">title</code> - Event title<br><code class="ys-code">timestamp</code> - ISO timestamp<br><code class="ys-code">options</code> - Event options (description, status, icon)</td><td><code class="ys-code">this</code></td><td>Convenience method to add an event</td></tr><tr><td><code class="ys-code">setItems(items)</code></td><td><code class="ys-code">items</code> - Array of TimelineItem objects</td><td><code class="ys-code">this</code></td><td>Replaces all timeline items</td></tr><tr><td><code class="ys-code">clearItems()</code></td><td>-</td><td><code class="ys-code">this</code></td><td>Removes all timeline items</td></tr><tr><td><code class="ys-code">getContent()</code></td><td>-</td><td><code class="ys-code">TimelineContent</code></td><td>Returns the complete timeline content object</td></tr><tr><td><code class="ys-code">serve()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Serves the view with validation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">Record&lt;string, unknown&gt;</code></td><td>Returns JSON representation (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setState(key, value)</code></td><td><code class="ys-code">key</code> - State key<br><code class="ys-code">value</code> - State value</td><td><code class="ys-code">void</code></td><td>Sets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">getState(key)</code></td><td><code class="ys-code">key</code> - State key</td><td><code class="ys-code">unknown</code></td><td>Gets view state (inherited from BaseView)</td></tr><tr><td><code class="ys-code">setNext(url)</code></td><td><code class="ys-code">url</code> - URL or path of the next view</td><td><code class="ys-code">this</code></td><td>Forward control of a paginated sequence, drawn by the client — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPrev(url)</code></td><td><code class="ys-code">url</code> - URL or path of the previous view</td><td><code class="ys-code">this</code></td><td>Backward control of the same sequence. NOT where the back gesture leads — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setEntry(entry)</code></td><td><code class="ys-code">entry</code> - <code class="ys-code">'push'</code>, <code class="ys-code">'replace'</code>, or an integer &lt;= 1</td><td><code class="ys-code">this</code></td><td>How this view enters the client's navigation stack (default: <code class="ys-code">push</code>) — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setPage(current, total?)</code></td><td><code class="ys-code">current</code> - 1-based position<br><code class="ys-code">total</code> - sequence length, when known</td><td><code class="ys-code">this</code></td><td>Where this view sits in its sequence; the client draws the indicator — see <a href="/docs/navigation">Navigation</a></td></tr><tr><td><code class="ys-code">setProcess(processId, context?)</code></td><td><code class="ys-code">processId</code> - Process ID<br><code class="ys-code">context</code> - Process context</td><td><code class="ys-code">this</code></td><td>Sets process context (inherited from BaseView)</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">JavaScript Sample Code</h2>
+
+<h3 id="basic-timeline">Basic Timeline</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({ appId: 'my-app' });
+
+const timeline = yeriaApp
+    .createTimelineView('onboarding', 'Your Progress')
+    .setIntro('Follow the validation steps')
+    .addEvent('step-1', 'Account Created', new Date().toISOString(), { status: 'completed' })
+    .addEvent('step-2', 'Documents Sent', '2025-01-15T12:00:00Z', { status: 'active' })
+    .addEvent('step-3', 'Final Validation', '2025-01-20T09:00:00Z', { status: 'pending' });
+
+const response = yeriaApp.serve(timeline);</code></pre>
+
+<h3 id="timeline-with-full-item-objects">Timeline with Full Item Objects</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const timeline = yeriaApp
+    .createTimelineView('activity', 'Activity Feed')
+    .setIntro('Recent activity')
+    .addItem({
+        id: 'event-1',
+        title: 'Order Placed',
+        timestamp: '2025-01-15T10:00:00Z',
+        description: 'Your order #12345 has been placed',
+        status: 'completed',
+        icon: 'check'
+    })
+    .addItem({
+        id: 'event-2',
+        title: 'Order Shipped',
+        timestamp: '2025-01-16T14:30:00Z',
+        description: 'Your order has been shipped',
+        status: 'completed',
+        icon: 'truck'
+    })
+    .addItem({
+        id: 'event-3',
+        title: 'Out for Delivery',
+        timestamp: '2025-01-17T08:00:00Z',
+        description: 'Your order is out for delivery',
+        status: 'active',
+        icon: 'delivery'
+    });</code></pre>
+
+<h3 id="timeline-with-different-statuses">Timeline with Different Statuses</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const timeline = yeriaApp
+    .createTimelineView('process', 'Process Status')
+    .setIntro('Track your process')
+    .addEvent('step-1', 'Step 1', '2025-01-01T00:00:00Z', { 
+        status: 'completed',
+        description: 'Step 1 completed successfully'
+    })
+    .addEvent('step-2', 'Step 2', '2025-01-02T00:00:00Z', { 
+        status: 'active',
+        description: 'Currently processing step 2'
+    })
+    .addEvent('step-3', 'Step 3', '2025-01-03T00:00:00Z', { 
+        status: 'pending',
+        description: 'Waiting to start step 3'
+    })
+    .addEvent('step-4', 'Step 4', '2025-01-04T00:00:00Z', { 
+        status: 'error',
+        description: 'Error occurred in step 4'
+    });</code></pre>
+
+<h3 id="timeline-clearing-and-replacing-items">Timeline Clearing and Replacing Items</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const timeline = yeriaApp
+    .createTimelineView('dynamic-timeline', 'Dynamic Timeline')
+    .addEvent('event-1', 'Event 1', '2025-01-01T00:00:00Z')
+    .addEvent('event-2', 'Event 2', '2025-01-02T00:00:00Z');
+
+// Clear all items
+timeline.clearItems();
+
+// Set new items
+timeline.setItems([
+    {
+        id: 'new-event-1',
+        title: 'New Event 1',
+        timestamp: '2025-01-10T00:00:00Z',
+        status: 'completed'
+    },
+    {
+        id: 'new-event-2',
+        title: 'New Event 2',
+        timestamp: '2025-01-11T00:00:00Z',
+        status: 'active'
+    }
+]);</code></pre>
+
+<h3 id="timeline-in-process-workflow">Timeline in Process Workflow</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const timeline = yeriaApp
+    .createTimelineView('onboarding-timeline', 'Onboarding Progress')
+    .setProcess('onboarding', {
+        processName: 'User Onboarding',
+        currentStep: 2,
+        totalSteps: 4
+    })
+    .setIntro('Complete these steps to get started')
+    .addEvent('profile', 'Complete Profile', '2025-01-01T00:00:00Z', { 
+        status: 'completed',
+        description: 'Profile information completed'
+    })
+    .addEvent('verification', 'Verify Email', '2025-01-02T00:00:00Z', { 
+        status: 'active',
+        description: 'Please verify your email address'
+    })
+    .addEvent('preferences', 'Set Preferences', '2025-01-03T00:00:00Z', { 
+        status: 'pending',
+        description: 'Customize your preferences'
+    })
+    .addEvent('tutorial', 'Complete Tutorial', '2025-01-04T00:00:00Z', { 
+        status: 'pending',
+        description: 'Learn how to use the app'
+    });</code></pre>
+
+<h2 id="complete-json-example">Complete JSON Example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "id": "onboarding-progress",
+  "type": "Timeline",
+  "content": {
+    "title": "Onboarding Progress",
+    "intro": "Complete these steps to get started",
+    "items": [
+      {
+        "id": "profile",
+        "title": "Complete Profile",
+        "timestamp": "2025-01-01T00:00:00Z",
+        "description": "Profile information completed",
+        "status": "completed",
+        "icon": "check",
+        "meta": {
+          "completedAt": "2025-01-01T10:30:00Z"
+        }
+      },
+      {
+        "id": "verification",
+        "title": "Verify Email",
+        "timestamp": "2025-01-02T00:00:00Z",
+        "description": "Please verify your email address",
+        "status": "active",
+        "icon": "mail"
+      },
+      {
+        "id": "preferences",
+        "title": "Set Preferences",
+        "timestamp": "2025-01-03T00:00:00Z",
+        "description": "Customize your preferences",
+        "status": "pending",
+        "icon": "settings"
+      },
+      {
+        "id": "tutorial",
+        "title": "Complete Tutorial",
+        "timestamp": "2025-01-04T00:00:00Z",
+        "description": "Learn how to use the app",
+        "status": "pending",
+        "icon": "book"
+      }
+    ]
+  },
+  "process": {
+    "processId": "onboarding",
+    "processName": "User Onboarding",
+    "currentStep": 2,
+    "totalSteps": 4
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-01-28T10:00:00.000Z"
+  }
+}</code></pre>

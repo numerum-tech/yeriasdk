@@ -1,0 +1,213 @@
+<h2 id="description">Description</h2>
+
+<p>The <code class="ys-code">Notification</code> component enables sending signed notifications to the Yeria platform, which then distributes them to specific users. Notifications are signed using Ed25519 (same as views) and pushed to the Yeria backend (<code class="ys-code">POST {baseUrl}/api/v1/user/notifications</code>). Each notification targets a single user and contains a message with title, body, and optional in-app navigation links.</p>
+
+<p><strong>Key Features:</strong></p>
+
+<ul><li>User-specific targeting (userId required)</li><li>Signed notifications with Ed25519</li><li>Push model: SDK sends to the Yeria platform</li><li>Optional in-app navigation links</li><li>Platform distributes to users</li></ul>
+
+<h2 id="subscription-requirement-fail-closed-consent-gate">⚠ Subscription Requirement (fail-closed consent gate)</h2>
+
+<p><strong>The Yeria platform only delivers notifications when the target user has explicitly subscribed to the sending service.</strong> There is no broadcast primitive and no way for a service to create a subscription on a user's behalf — subscriptions are always user-initiated from the Yeria mobile or web app.</p>
+
+<p>When your service signs and POSTs a notification:</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Scenario</th><th>HTTP status</th><th>Error code in body</th></tr></thead><tbody><tr><td>User subscribed, not muted, not blocked</td><td><code class="ys-code">201 Created</code></td><td>— (delivery proceeds)</td></tr><tr><td>User never subscribed (or unsubscribed)</td><td><code class="ys-code">403 Forbidden</code></td><td><code class="ys-code">SUBSCRIPTION_REQUIRED</code></td></tr><tr><td>User subscribed but muted</td><td><code class="ys-code">403 Forbidden</code></td><td><code class="ys-code">SUBSCRIPTION_MUTED</code></td></tr><tr><td>User blocked the service</td><td><code class="ys-code">403 Forbidden</code></td><td><code class="ys-code">SUBSCRIPTION_BLOCKED</code></td></tr></tbody></table></div>
+
+<p>Rejected notifications are <strong>not</strong> persisted — your service cannot probe the user's subscription state by sending notifications and inspecting responses beyond the error code returned synchronously.</p>
+
+<h3 id="recommended-onboarding-ux">Recommended onboarding UX</h3>
+
+<p>Since your service cannot auto-subscribe a user, present an "Enable notifications" call-to-action in your Yeria views when a user first engages with the service. The CTA should use the canonical Yeria deeplink (<code class="ys-code">yeria://dl/n/{serviceId}</code>, or <code class="ys-code">https://yeria.app/dl/n/{serviceId}</code>), which prompts the user to grant consent.</p>
+
+<p>Handle <code class="ys-code">SUBSCRIPTION_*</code> error codes gracefully — a 403 from the notifications endpoint is an expected outcome for any user who has not opted in, not an infrastructure failure. Consider rate-limiting retries so your service doesn't hammer the endpoint on every rejection.</p>
+
+<h2 id="fields-description">Fields Description</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">userId</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Unique identifier for the target user</td></tr><tr><td><code class="ys-code">message</code></td><td><code class="ys-code">NotificationMessage</code></td><td>Yes</td><td>Notification message object</td></tr><tr><td><code class="ys-code">message.title</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Notification title</td></tr><tr><td><code class="ys-code">message.body</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Notification body text</td></tr><tr><td><code class="ys-code">message.link</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Optional in-app navigation link (e.g., "/profile" or "app://view/123")</td></tr></tbody></table></div>
+
+<h2 id="secure-notification-response-structure">Secure Notification Response Structure</h2>
+
+<p>When a notification is signed, it follows this structure:</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">appId</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Application identifier</td></tr><tr><td><code class="ys-code">signature</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Ed25519 signature (base64 encoded)</td></tr><tr><td><code class="ys-code">timestamp</code></td><td><code class="ys-code">number</code></td><td>Yes</td><td>Timestamp in milliseconds</td></tr><tr><td><code class="ys-code">notification</code></td><td><code class="ys-code">NotificationPayload</code></td><td>Yes</td><td>Notification payload</td></tr><tr><td><code class="ys-code">notification.userId</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Target user ID</td></tr><tr><td><code class="ys-code">notification.message</code></td><td><code class="ys-code">NotificationMessage</code></td><td>Yes</td><td>Message content</td></tr></tbody></table></div>
+
+<h2 id="methods">Methods</h2>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Method</th><th>Parameters</th><th>Returns</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">new Notification(userId, title, body, link?)</code></td><td><code class="ys-code">userId</code> - User ID<br><code class="ys-code">title</code> - Notification title<br><code class="ys-code">body</code> - Notification body<br><code class="ys-code">link</code> - Optional navigation link</td><td><code class="ys-code">Notification</code></td><td>Creates a notification instance</td></tr><tr><td><code class="ys-code">setLink(link)</code></td><td><code class="ys-code">link</code> - Navigation link URL</td><td><code class="ys-code">this</code></td><td>Sets the optional in-app navigation link</td></tr><tr><td><code class="ys-code">signNotification(notification)</code></td><td><code class="ys-code">notification</code> - Notification instance</td><td><code class="ys-code">SecureNotificationResponse</code></td><td>Signs the notification with Ed25519</td></tr><tr><td><code class="ys-code">sendNotification(notification)</code></td><td><code class="ys-code">notification</code> - Notification instance</td><td><code class="ys-code">Promise&lt;void&gt;</code></td><td>Signs and POSTs the notification to <code class="ys-code">{baseUrl}/api/v1/user/notifications</code></td></tr><tr><td><code class="ys-code">toJSON()</code></td><td>-</td><td><code class="ys-code">NotificationPayload</code></td><td>Returns notification payload as JSON</td></tr></tbody></table></div>
+
+<h2 id="javascript-sample-code">JavaScript Sample Code</h2>
+
+<h3 id="basic-notification">Basic Notification</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaApp, Notification } from '@numerum-tech/yeriasdk';
+
+const yeriaApp = new YeriaApp({
+    appId: 'my-app',
+    baseUrl: 'https://yeria.app'
+});
+
+const notification = new Notification('user-123', 'Welcome!', 'Thank you for joining Yeria')
+    .setLink('/welcome');
+
+const signedNotification = yeriaApp.signNotification(notification);
+// Send manually or use sendNotification()</code></pre>
+
+<h3 id="notification-with-in-app-link">Notification with In-App Link</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const notification = new Notification(
+    'user-456',
+    'New Message',
+    'You have a new message from John',
+    '/messages/123'  // Optional link parameter
+);
+
+await yeriaApp.sendNotification(notification);</code></pre>
+
+<h3 id="notification-without-link">Notification Without Link</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const notification = new Notification(
+    'user-789',
+    'Reminder',
+    'Don\'t forget to complete your profile'
+);
+
+await yeriaApp.sendNotification(notification);</code></pre>
+
+<h3 id="manual-notification-sending">Manual Notification Sending</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const notification = new Notification('user-123', 'Alert', 'System maintenance scheduled');
+
+const signedNotification = yeriaApp.signNotification(notification);
+
+// Send manually using your HTTP client
+const response = await fetch('https://yeria.app/api/v1/user/notifications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(signedNotification)
+});</code></pre>
+
+<h2 id="python-sample-code">Python Sample Code</h2>
+
+<h3 id="basic-notification">Basic Notification</h3>
+
+<pre class="ys-codeblock" data-lang="python"><code>from yeriasdk import YeriaApp, YeriaAppConfig, Notification
+
+config = YeriaAppConfig(
+    app_id='my-app',
+    base_url='https://yeria.app'
+)
+json_app = YeriaApp(config)
+
+notification = Notification('user-123', 'Welcome!', 'Thank you for joining Yeria')
+notification.set_link('/welcome')
+
+signed_notification = json_app.sign_notification(notification)
+# Send manually or use send_notification()</code></pre>
+
+<h3 id="notification-with-in-app-link">Notification with In-App Link</h3>
+
+<pre class="ys-codeblock" data-lang="python"><code>notification = Notification(
+    'user-456',
+    'New Message',
+    'You have a new message from John',
+    link='/messages/123'  # Optional link parameter
+)
+
+json_app.send_notification(notification)</code></pre>
+
+<h3 id="notification-without-link">Notification Without Link</h3>
+
+<pre class="ys-codeblock" data-lang="python"><code>notification = Notification(
+    'user-789',
+    'Reminder',
+    'Don\'t forget to complete your profile'
+)
+
+json_app.send_notification(notification)</code></pre>
+
+<h3 id="manual-notification-sending">Manual Notification Sending</h3>
+
+<pre class="ys-codeblock" data-lang="python"><code>import requests
+
+notification = Notification(
+    'user-123',
+    'Alert',
+    'System maintenance scheduled'
+)
+
+signed_notification = json_app.sign_notification(notification)
+
+# Send manually using requests
+payload = {
+    'appId': signed_notification.app_id,
+    'signature': signed_notification.signature,
+    'timestamp': signed_notification.timestamp,
+    'notification': {
+        'userId': signed_notification.notification.user_id,
+        'message': {
+            'title': signed_notification.notification.message.title,
+            'body': signed_notification.notification.message.body,
+            'link': signed_notification.notification.message.link,
+        }
+    }
+}
+
+response = requests.post(
+    'https://yeria.app/api/v1/user/notifications',
+    json=payload
+)</code></pre>
+
+<h2 id="complete-json-example">Complete JSON Example</h2>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "appId": "my-app",
+  "signature": "MEUCIQD...",
+  "timestamp": 1706443200000,
+  "notification": {
+    "userId": "user-123",
+    "message": {
+      "title": "Welcome!",
+      "body": "Thank you for joining Yeria",
+      "link": "/welcome"
+    }
+  }
+}</code></pre>
+
+<h2 id="configuration">Configuration</h2>
+
+<h3 id="yeriaappconfig">YeriaAppConfig</h3>
+
+<p>Add notification-related configuration to <code class="ys-code">YeriaAppConfig</code>:</p>
+
+<pre class="ys-codeblock" data-lang="typescript"><code>interface YeriaAppConfig {
+    appId: string;
+    baseUrl?: string;             // Yeria platform base URL (e.g. https://yeria.app)
+    notificationTimeout?: number; // HTTP request timeout in ms (default: 5000)
+    // ... other config options
+}</code></pre>
+
+<pre class="ys-codeblock" data-lang="python"><code>@dataclass
+class YeriaAppConfig:
+    app_id: str
+    base_url: Optional[str] = None  # Yeria platform base URL (e.g. https://yeria.app)
+    notification_timeout: int = 5   # HTTP request timeout in seconds
+    # ... other config options</code></pre>
+
+<h2 id="error-handling">Error Handling</h2>
+
+<ul><li><code class="ys-code">MissingRequiredParameterError</code>: Thrown if userId, title, or body is missing</li><li><code class="ys-code">ConfigurationError</code>: Thrown if <code class="ys-code">baseUrl</code> is not configured when calling <code class="ys-code">sendNotification()</code></li><li><code class="ys-code">ExternalError</code>: Thrown if HTTP request fails when sending notification</li></ul>
+
+<h2 id="signing-details">Signing Details</h2>
+
+<p>Notifications use the same Ed25519 signing mechanism as views:</p>
+
+<ol><li>Notification payload is serialized to JSON</li><li>Payload is signed: <code class="ys-code">JSON.stringify({ notification: notificationJson, timestamp, appId })</code></li><li>Signature is base64 encoded</li><li>Signed notification includes appId, signature, timestamp, and notification payload</li></ol>
+
+<h2 id="platform-integration">Platform Integration</h2>
+
+<p>The Yeria platform receives signed notifications via HTTP POST:</p>
+
+<ul><li><strong>Endpoint</strong>: <code class="ys-code">{baseUrl}/api/v1/user/notifications</code> (<code class="ys-code">baseUrl</code> from <code class="ys-code">YeriaAppConfig</code>)</li><li><strong>Method</strong>: POST</li><li><strong>Content-Type</strong>: application/json</li><li><strong>Body</strong>: Signed notification JSON (see Complete JSON Example above)</li></ul>
+
+<p>The platform verifies the signature and distributes the notification to the target user.</p>

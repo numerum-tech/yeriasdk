@@ -1,0 +1,181 @@
+<h2 id="description">Description</h2>
+
+<p>Le SDK expose <strong>deux</strong> objets aux fournisseurs. Le partage se fait selon qui détient le secret.</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Objet</th><th>Détient une clé ?</th><th>Rôle</th></tr></thead><tbody><tr><td><code class="ys-code">YeriaUI</code></td><td>Non</td><td><strong>Fabrique</strong> de vues. Construit des vues typées. Pure, sans état, jamais instanciée — utilisée comme <code class="ys-code">Math</code> ou <code class="ys-code">JSON</code>.</td></tr><tr><td><code class="ys-code">YeriaApp</code></td><td>Oui (Ed25519)</td><td>Tout ce qui exige la clé privée : <strong>signer</strong> les vues, vérifier les jetons utilisateurs entrants, notifier, effectuer la rotation de clé.</td></tr></tbody></table></div>
+
+<p>Construire ne demande pas de clé ; signer, si. Vous construisez une vue avec <code class="ys-code">YeriaUI</code>, puis vous la passez à <code class="ys-code">app.serve(view)</code> — un transfert de rôle, pas un aller-retour sur un même objet.</p>
+
+<p>Tout le reste (<code class="ys-code">YeriaSigner</code>, <code class="ys-code">YeriaPublicKeys</code>, le client de plateforme, les vérificateurs) est <strong>interne</strong>. Ce n'est pas exporté et vous n'avez pas à y toucher.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaUI, YeriaApp } from '@numerum-tech/yeriasdk';
+
+const app = new YeriaApp({
+    appId: process.env.YERIA_APP_ID,
+    baseUrl: process.env.YERIA_BASE_URL,
+    privateKey: process.env.SERVICE_ED25519_PRIVATE_KEY,
+});
+
+const view = YeriaUI.createFormView('registration', 'User Registration')
+    .addTextField('name', 'Name', true)
+    .submitButton('Register', 'POST');
+
+return app.serve(view);   // → { payload, signature }</code></pre>
+
+<hr>
+
+<h2 id="the-two-key-systems">Les deux systèmes de clés</h2>
+
+<p>Ne les confondez pas : ils couvrent deux sens de circulation différents.</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Clé</th><th>Algorithme</th><th>Détenteur</th><th>Rôle</th></tr></thead><tbody><tr><td>Clé de plateforme Yeria</td><td>RSA (<strong>RS256</strong>)</td><td>Yeria</td><td>Signe les jetons utilisateurs que reçoit votre backend. Vous ne faites que <strong>vérifier</strong> avec elle — le SDK la récupère et la met en cache pour vous.</td></tr><tr><td>Clé de votre service</td><td><strong>Ed25519</strong></td><td>Vous</td><td>Signe les enveloppes de vue que vous renvoyez, ainsi que vos appels vers Yeria. La moitié publique est enregistrée sur votre service ; la privée ne quitte jamais votre backend.</td></tr></tbody></table></div>
+
+<p><code class="ys-code">app.verifyUserToken()</code> rejette tout jeton dont l'en-tête <code class="ys-code">alg</code> n'est pas <code class="ys-code">RS256</code>. Les enveloppes de vue et les enveloppes signées par un fournisseur sont toujours en Ed25519.</p>
+
+<hr>
+
+<h2 id="yeriaui-the-view-factory">YeriaUI — la fabrique de vues</h2>
+
+<p>Sans clé. Importez et utilisez directement : il n'y a pas de constructeur.</p>
+
+<h3 id="factory-methods">Méthodes de fabrique</h3>
+
+<p>Chacune renvoie un nouveau constructeur de vue typée.</p>
+
+<ul><li><code class="ys-code">createFormView(formId: string, title: string, processId?: string): FormView</code></li><li><code class="ys-code">createReaderView(viewId: string, title: string, processId?: string): ReaderView</code></li><li><code class="ys-code">createActionListView(viewId: string, title: string, processId?: string): ActionListView</code></li><li><code class="ys-code">createActionGridView(viewId: string, title: string, processId?: string): ActionGridView</code></li><li><code class="ys-code">createIconGridView(viewId: string, title: string, processId?: string): IconGridView</code></li><li><code class="ys-code">createQRScanView(viewId: string, title: string, processId?: string): QRScanView</code></li><li><code class="ys-code">createQRDisplayView(viewId: string, title: string, processId?: string): QRDisplayView</code></li><li><code class="ys-code">createMessageView(viewId: string, title: string, processId?: string): MessageView</code></li><li><code class="ys-code">createCardView(viewId: string, title: string, processId?: string): CardView</code></li><li><code class="ys-code">createCarouselView(viewId: string, title: string, processId?: string): CarouselView</code></li><li><code class="ys-code">createTimelineView(viewId: string, title: string, processId?: string): TimelineView</code></li><li><code class="ys-code">createMediaView(viewId: string, title: string, processId?: string): MediaView</code></li><li><code class="ys-code">createMapView(viewId: string, title: string, processId?: string): MapView</code></li></ul>
+
+<h3 id="rehydrating-a-stored-view">Reconstituer une vue stockée</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>fromJson(json: Record&lt;string, unknown&gt;): BaseView</code></pre>
+
+<p>Transforme du JSON de transport (un gabarit statique, ou une vue que vous avez persistée dans votre base) en une instance de vue typée et validée. À utiliser quand vous stockez vos écrans en JSON plutôt que de les reconstruire champ par champ :</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>const view = YeriaUI.fromJson(await db.screens.get('home'));
+return app.serve(view);</code></pre>
+
+<h3 id="unsigned-error-body">Corps d'erreur non signé</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>error(spec: ProviderErrorSpec): ProviderErrorBody</code></pre>
+
+<p>Construit un corps d'erreur byte-identique à celui de la plateforme, mais sans signature. À utiliser quand aucune clé n'est disponible (échec au démarrage, erreur de configuration). Si vous <em>avez</em> une clé, préférez <code class="ys-code">app.serveError()</code> : une erreur signée est une erreur à laquelle le mobile peut se fier.</p>
+
+<hr>
+
+<h2 id="yeriaapp-the-key-holder">YeriaApp — le détenteur de la clé</h2>
+
+<h3 id="configuration">Configuration</h3>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">appId</code></td><td><code class="ys-code">string</code></td><td>Yes</td><td>Identifiant unique de l'application. Transporté dans chaque charge utile signée.</td></tr><tr><td><code class="ys-code">privateKey</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Clé privée Ed25519, au format PEM (PKCS#8). Générée à la volée si omise — acceptable en test, jamais en production.</td></tr><tr><td><code class="ys-code">publicKey</code></td><td><code class="ys-code">string</code></td><td>No</td><td>Clé publique Ed25519, au format PEM (SPKI). Dérivée de <code class="ys-code">privateKey</code> si omise.</td></tr><tr><td><code class="ys-code">baseUrl</code></td><td><code class="ys-code">string</code></td><td>No</td><td>URL de base de Yeria, par exemple <code class="ys-code">https://yeria.app</code>. Nécessaire pour <code class="ys-code">verifyUserToken</code>, <code class="ys-code">notify</code>, <code class="ys-code">fetchUserDetails</code>, <code class="ys-code">rotateKey</code>.</td></tr><tr><td><code class="ys-code">allowedDomains</code></td><td><code class="ys-code">string[]</code></td><td>No</td><td>Domaines autorisés pour la diffusion des vues (par défaut <code class="ys-code">[]</code>).</td></tr><tr><td><code class="ys-code">viewExpirationMinutes</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Durée de vie d'une vue, utilisée par <code class="ys-code">verifyIntegrity</code> (par défaut <code class="ys-code">60</code>).</td></tr><tr><td><code class="ys-code">notificationTimeout</code></td><td><code class="ys-code">number</code></td><td>No</td><td>Délai HTTP en millisecondes pour les appels à la plateforme (par défaut <code class="ys-code">5000</code>).</td></tr></tbody></table></div>
+
+<h3 id="serving-views">Servir des vues</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>serve(view: BaseView): SignedEnvelope</code></pre>
+
+<p>Signe une vue dans une enveloppe v3. C'est l'<strong>unique</strong> chemin de signature — renvoyez le résultat tel quel :</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>res.json(app.serve(view));</code></pre>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>serveError(spec: ProviderErrorSpec): SignedEnvelope</code></pre>
+
+<p>Même enveloppe, portant une erreur au lieu d'une vue. Le mobile vérifie la signature avant d'afficher quoi que ce soit : une erreur signée ne peut donc pas être falsifiée par un attaquant sur le réseau. Le champ <code class="ys-code">status</code> est indicatif — le mobile ne se fie pas au code HTTP.</p>
+
+<h3 id="signedenvelope">SignedEnvelope</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>{
+  payload: string,     // JSON string: {"appId":…,"timestamp":…,"view":{…}}
+  signature: string    // Ed25519 signature over the payload STRING BYTES, base64
+}</code></pre>
+
+<p>La signature porte sur les octets exacts de <code class="ys-code">payload</code>. Un vérificateur doit contrôler ces octets <strong>avant</strong> d'analyser le JSON : re-sérialiser d'abord modifierait les octets et invaliderait la signature.</p>
+
+<h3 id="verification-keys">Vérification et clés</h3>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Retour</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">verifyIntegrity(envelope: SignedEnvelope)</code></td><td><code class="ys-code">boolean</code></td><td>Vérifie une enveloppe signée par cette application. Lève une erreur si l'appId ne correspond pas, si la vue a expiré ou si la signature est invalide.</td></tr><tr><td><code class="ys-code">getServicePublicKey()</code></td><td><code class="ys-code">string</code></td><td>Clé publique Ed25519 de votre service (PEM). C'est la valeur à enregistrer sur votre service Yeria.</td></tr></tbody></table></div>
+
+<h3 id="inbound-user-tokens">Jetons utilisateurs entrants</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>async verifyUserToken(
+    bearerToken: string,
+    expectedAudience?: string | number,
+): Promise&lt;YeriaTokenClaims&gt;</code></pre>
+
+<p>Vérifie un jeton utilisateur émis par Yeria (RS256). Résout le <code class="ys-code">kid</code> du jeton contre les clés publiques de Yeria via un magasin interne à cache TTL — vous n'avez ni résolveur à câbler ni PEM à détenir. Impose <code class="ys-code">iss='yeria'</code> et <code class="ys-code">exp &gt; now</code> ; passez <code class="ys-code">expectedAudience</code> pour épingler le jeton sur l'identifiant de votre service.</p>
+
+<p>Lève <code class="ys-code">YeriaPlatformUnreachableError</code> quand Yeria est injoignable (renvoyez <code class="ys-code">503</code> — le jeton est peut-être valide). Une clé inconnue ou expirée remonte comme une erreur de vérification (renvoyez <code class="ys-code">401</code>).</p>
+
+<h3 id="user-details">Profil utilisateur</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>async fetchUserDetails(opts: {
+    userServiceToken: string;
+    fetch?: typeof fetch;
+}): Promise&lt;UserDetails&gt;</code></pre>
+
+<p>Récupère le profil d'un utilisateur Yeria, <strong>autorisé par le jeton de service vivant de l'utilisateur lui-même</strong> — ni par vos préférences de notification, ni par un jeton porteur placé dans le corps. Le justificatif transmis est la signature Ed25519 de l'enveloppe.</p>
+
+<h3 id="notifications">Notifications</h3>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Retour</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">signNotification(notification: Notification)</code></td><td><code class="ys-code">SecureNotificationResponse</code></td><td>Signe sans envoyer.</td></tr><tr><td><code class="ys-code">async notify(notification: Notification)</code></td><td><code class="ys-code">Promise&lt;void&gt;</code></td><td>Signe et envoie en POST à Yeria.</td></tr></tbody></table></div>
+
+<p>Voir <a href="/docs/notifications">Notifications</a> pour les règles de distribution et les erreurs d'abonnement.</p>
+
+<h3 id="key-rotation">Rotation de clé</h3>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>async rotateKey(...)</code></pre>
+
+<p>Enregistre une nouvelle clé publique Ed25519 pour votre service. L'ancienne reste valide pendant une courte période de grâce, pour ne pas casser les requêtes en cours.</p>
+
+<h3 id="static-escape-hatches">Échappatoires statiques</h3>
+
+<p>Préférez les méthodes d'instance. Celles-ci existent pour le cas rare où vous détenez déjà le PEM exact, ou ne voulez aucun appel réseau.</p>
+
+<div class="ys-table-wrap"><table><thead><tr><th>Méthode</th><th>Description</th></tr></thead><tbody><tr><td><code class="ys-code">static verifySignature(publicKey, payload, signature, onError?)</code></td><td>Vérification Ed25519 brute d'une chaîne de charge utile contre un PEM.</td></tr><tr><td><code class="ys-code">static signView(view, appId, privateKey, timestamp?)</code></td><td>Signe une vue en <code class="ys-code">SignedEnvelope</code> à partir d'une clé ponctuelle.</td></tr><tr><td><code class="ys-code">static verifyYeriaToken(jwt, yeriaPublicKey, expectedAudience?)</code></td><td>Vérifie un jeton utilisateur contre un PEM connu. Pur, sans réseau.</td></tr><tr><td><code class="ys-code">static async verifyYeriaTokenWithResolver(jwt, resolver, expectedAudience?)</code></td><td>Idem, mais c'est vous qui fournissez le résolveur de <code class="ys-code">kid</code>.</td></tr></tbody></table></div>
+
+<hr>
+
+<h2 id="complete-example">Exemple complet</h2>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import express from 'express';
+import { YeriaUI, YeriaApp } from '@numerum-tech/yeriasdk';
+
+const app = new YeriaApp({
+    appId: process.env.YERIA_APP_ID,
+    baseUrl: process.env.YERIA_BASE_URL,
+    privateKey: process.env.SERVICE_ED25519_PRIVATE_KEY,
+});
+
+const server = express();
+
+server.get('/screens/registration', async (req, res) =&gt; {
+    const bearer = (req.headers.authorization ?? '').replace(/^Bearer /i, '');
+
+    try {
+        const claims = await app.verifyUserToken(bearer, process.env.YERIA_SERVICE_ID);
+
+        const form = YeriaUI.createFormView('registration', 'User Registration')
+            .setIntro(`Welcome, ${claims.sub}`)
+            .addTextField('name', 'Name', true)
+            .addEmailField('email', 'Email', true)
+            .submitButton('Register', 'POST');
+
+        return res.json(app.serve(form));
+    } catch (err) {
+        return res.status(401).json(app.serveError({
+            code: 'auth.invalid_token',
+            message: 'Session expirée, reconnectez-vous.',
+            status: 401,
+        }));
+    }
+});</code></pre>
+
+<p>La charge utile reçue par le mobile :</p>
+
+<pre class="ys-codeblock" data-lang="json"><code>{
+  "payload": "{\"appId\":\"my-app\",\"timestamp\":1706443200000,\"view\":{\"id\":\"registration\",\"type\":\"Form\",\"content\":{…}}}",
+  "signature": "MEUCIQD…"
+}</code></pre>
+
+<hr>
+
+<h2 id="see-also">Voir aussi</h2>
+
+<ul><li><a href="/docs/integration">Intégration provider</a> — clés, authentification, profils utilisateurs, de bout en bout</li><li><a href="/docs/introduction">Spécifications des composants</a> — tous les types de vue</li></ul>

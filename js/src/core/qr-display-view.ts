@@ -41,7 +41,6 @@ export class QRDisplayView extends BaseView {
 
         this.content = {
             title,
-            intro: '',
             submit: undefined,
             qrImage: '',
             qrTitle: '',

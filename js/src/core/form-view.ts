@@ -3,13 +3,21 @@ import {
     // BaseViewConfig,
     FormFieldParams,
     SubmitAction,
+    SecondaryAction,
+    ParagraphSize,
+    SpacerSize,
+    SelectDisplay,
     FieldValidation,
     ValidationResult,
-    HttpMethod
+    HttpMethod,
+    CaptureSource,
+    VideoQuality
 } from '../types';
-import { FieldValidator, FormValidator } from '../utils/validators';
+import { FieldValidator, FormValidator, validateStoredMediaPaths } from '../utils/validators';
+import { FileFormatManager } from '../utils/fileFormats';
 import {
     MissingRequiredParameterError,
+    InvalidParameterError,
     FieldValidationError,
     FieldNotFoundError,
     EmptyCollectionError,
@@ -18,10 +26,99 @@ import {
     Err
 } from '../errors';
 
+/**
+ * Field types that display something instead of collecting it. They occupy a
+ * slot in `fields` because that array carries ORDER, but they hold no value,
+ * are never submitted, and are skipped by validation.
+ */
+/**
+ * Options shared by every media field (photo / file / audio / video).
+ *
+ * `value` + `readonly` is what turns a capture field into a VIEWER of what the
+ * provider already holds: the URL (or URLs) of stored files, shown without any
+ * capture control. Without `readonly` the value is simply a pre-fill the user
+ * may replace.
+ */
+export interface MediaFieldOptions {
+    value?: string | string[];
+    readonly?: boolean;
+    disabled?: boolean;
+}
+
+export const DISPLAY_ONLY_TYPES = ['separator', 'paragraph', 'spacer'];
+
+/**
+ * The order a field's keys are emitted in.
+ *
+ * A signature is taken over the compact JSON, so key order is part of the wire
+ * contract, not a cosmetic detail. Building a field as `{...params}` handed
+ * that decision to the provider: JavaScript preserves an object literal's
+ * insertion order, so `{multiple, source}` and `{source, multiple}` signed
+ * differently, and `updateField` appended a late key at the end rather than at
+ * its place. This list is the single canonical order; it mirrors the order of
+ * the `field[...]` insertions in py/yeriasdk/views/form_view.py, and the two
+ * must be changed together.
+ */
+const FIELD_KEY_ORDER: Array<keyof FormFieldParams> = [
+    'value', 'required', 'pattern', 'min', 'max', 'minLength', 'maxLength',
+    'options', 'display', 'accept', 'live', 'altitude', 'maxAccuracy',
+    'precision', 'placeholder', 'helpText', 'disabled', 'readonly',
+    'size', 'bold', 'italic', 'minDate', 'maxDate', 'multiple', 'maxCount',
+    'maxDuration', 'minDuration', 'source', 'quality', 'maxSize'
+];
+
+type EmittedField = FormFieldParams & { fieldType: string; fieldId: string; fieldLabel: string };
+
+/**
+ * Rebuilds a field with its keys in {@link FIELD_KEY_ORDER}. Keys that are
+ * absent or `undefined` are left out entirely rather than emitted as null —
+ * `JSON.stringify` drops an undefined value, and Python emits nothing at all,
+ * so omission is what the two SDKs agree on.
+ *
+ * A key the table does not know is KEPT, at the end and in its original order.
+ * Dropping it would be worse than misplacing it: a provider casting past the
+ * types to carry an extension key would watch it disappear from the payload
+ * without a word. Python's `order_field_keys` does the same.
+ */
+function orderFieldKeys(field: EmittedField): EmittedField {
+    const source = field as unknown as Record<string, unknown>;
+    const ordered = {
+        fieldType: field.fieldType,
+        fieldId: field.fieldId,
+        fieldLabel: field.fieldLabel
+    } as EmittedField;
+    const target = ordered as unknown as Record<string, unknown>;
+    // `null` goes the way of `undefined`: Python strips `None` from every
+    // payload at build time and the wire never carries a null, so a value
+    // cleared with `null` is a value removed, on both sides.
+    for (const key of FIELD_KEY_ORDER) {
+        if (source[key] !== undefined && source[key] !== null) {
+            // A RegExp has no JSON representation: `JSON.stringify` renders it
+            // `{}`, so every email field shipped a `"pattern":{}` that said
+            // nothing and matched nothing. Python emits the pattern's source
+            // text, which is what the spec documents, so send that.
+            target[key] = source[key] instanceof RegExp
+                ? (source[key] as RegExp).source
+                : source[key];
+        }
+    }
+    for (const key of Object.keys(source)) {
+        // `key in target` would walk the prototype chain and skip an extension
+        // key named `toString` or `constructor`, which Python would have kept.
+        if (!Object.prototype.hasOwnProperty.call(target, key) && source[key] !== undefined && source[key] !== null) {
+            target[key] = source[key];
+        }
+    }
+    return ordered;
+}
+
 export interface FormContent {
     title: string;
     intro?: string;
+    note?: string;
     submit?: SubmitAction;
+    /** Second action, rendered under the submit in the same footer bar. */
+    secondary?: SecondaryAction;
     fields: Array<FormFieldParams & { fieldType: string; fieldId: string; fieldLabel: string }>;
 }
 
@@ -29,7 +126,8 @@ export interface FormContent {
  * Builds a Form SGUI view — an interactive data-entry form.
  *
  * Fields are appended via `addField` and the typed helpers (`addTextField`,
- * `addEmailField`, `addSelectField`, `addPhotoField`, `addGPSField`, ...);
+ * `addEmailField`, `addSelectField`, `addPhotoField`, `addAudioField`,
+ * `addVideoField`, `addGPSField`, ...);
  * `submitButton`/`updateButton`/`deleteButton` define the submit action, and
  * `injectData`/`setFieldValue` pre-fill existing fields.
  *
@@ -57,7 +155,6 @@ export class FormView extends BaseView {
 
         this.content = {
             title,
-            intro: '',
             submit: undefined,
             fields: []
         } as FormContent;
@@ -68,6 +165,101 @@ export class FormView extends BaseView {
      */
     setIntro(intro: string): this {
         return this.setIntroText('intro', intro);
+    }
+
+    /**
+     * Small print under the intro — a usage caveat, a legal mention, a count.
+     * The mobile app has always rendered it; it simply had no setter here.
+     */
+    setNote(note: string): this {
+        if (typeof note !== 'string')
+            throw new InvalidParameterError('note', note, 'note must be a string');
+        (this.content as FormContent).note = note;
+        return this;
+    }
+
+    /**
+     * Displayed text placed among the fields — a heading, an instruction, the
+     * sentence the user has to read. It is NOT an input: it carries no value,
+     * it is never submitted, and it is skipped by validation.
+     *
+     * Kept deliberately poor: four sizes, bold, italic. Anything richer
+     * belongs in a ReaderView, not in the middle of a form.
+     *
+     * The sizes are sizes, not roles: nothing here says a block is a heading.
+     * What a given size means is the provider's call.
+     *
+     * @param text   the text to display
+     * @param options.size   'xl' | 'lg' | 'md' | 'sm' (default 'md')
+     * @param options.bold   render bold
+     * @param options.italic render italic
+     */
+    addParagraph(
+        text: string,
+        options: { size?: ParagraphSize; bold?: boolean; italic?: boolean } = {}
+    ): this {
+        if (typeof text !== 'string' || text.trim() === '')
+            throw new InvalidParameterError('text', text, 'paragraph text must be a non-empty string');
+
+        const size = options.size ?? 'md';
+        if (!['xl', 'lg', 'md', 'sm'].includes(size))
+            throw new InvalidParameterError('size', size, "size must be 'xl', 'lg', 'md' or 'sm'");
+
+        const params: FormFieldParams = { value: text, size };
+        if (options.bold) params.bold = true;
+        if (options.italic) params.italic = true;
+
+        // Goes through addField like everything else: one insertion path, one
+        // set of checks. The id stays unique for keying; it is never a
+        // submitted key.
+        return this.addField(
+            'paragraph',
+            `paragraph-${(this.content as FormContent).fields.length}`,
+            '',
+            params
+        );
+    }
+
+    /**
+     * Second action of the form, rendered under the submit button.
+     *
+     * @param text   button label
+     * @param url    where the action goes
+     * @param options.mode 'navigate' (default — values are discarded) or
+     *                     'submit' (current values are sent to `url`)
+     */
+    secondaryButton(
+        text: string,
+        url: string,
+        options: {
+            mode?: 'navigate' | 'submit';
+            method?: HttpMethod;
+            validate?: boolean;
+            confirmMessage?: string;
+        } = {}
+    ): this {
+        if (typeof text !== 'string' || text.trim() === '')
+            throw new InvalidParameterError('text', text, 'secondary button text is required');
+        if (typeof url !== 'string' || url.trim() === '')
+            throw new InvalidParameterError('url', url, 'secondary button url is required');
+
+        const mode = options.mode ?? 'navigate';
+        if (mode !== 'navigate' && mode !== 'submit')
+            throw new InvalidParameterError('mode', mode, "mode must be 'navigate' or 'submit'");
+
+        const action: SecondaryAction = {
+            text,
+            url,
+            mode,
+            // A skip blocked by an empty required field would be absurd; a
+            // second submit that skips validation would send garbage.
+            validate: options.validate ?? (mode === 'submit')
+        };
+        if (mode === 'submit') action.method = options.method ?? 'POST';
+        if (options.confirmMessage) action.confirmMessage = options.confirmMessage;
+
+        (this.content as FormContent).secondary = action;
+        return this;
     }
 
     /**
@@ -99,8 +291,9 @@ export class FormView extends BaseView {
         fieldLabel: string,
         params?: FormFieldParams
     ): this {
-        // Separators are visual-only and legitimately carry an empty label.
-        if (!fieldId || !fieldType || (fieldType !== 'separator' && !fieldLabel)) {
+        // Display-only entries carry no label: `separator` draws a rule,
+        // `paragraph` carries its text in `value`. Neither is an input.
+        if (!fieldId || !fieldType || (!DISPLAY_ONLY_TYPES.includes(fieldType) && !fieldLabel)) {
             throw new MissingRequiredParameterError('fieldId, fieldLabel, and fieldType');
         }
 
@@ -111,7 +304,7 @@ export class FormView extends BaseView {
             throw new FieldValidationError(fieldId, fieldType, errorMessages);
         }
 
-        const field = { fieldType, fieldId, fieldLabel, ...params };
+        const field = orderFieldKeys({ fieldType, fieldId, fieldLabel, ...params } as EmittedField);
         (this.content as FormContent).fields.push(field);
 
         // Store the validation for this field
@@ -187,26 +380,65 @@ export class FormView extends BaseView {
         });
     }
 
+    /**
+     * A date, optionally bounded.
+     *
+     * The bounds travel as `minDate` / `maxDate`, in `YYYY-MM-DD`, which is
+     * what the spec declares and what the client reads. They used to be
+     * converted to epoch milliseconds and emitted as `min` / `max`: the
+     * renderer types both as strings, so it read nothing and every bound was
+     * silently dropped — a form asking for a birth date accepted tomorrow.
+     * The Python SDK always emitted the documented shape, so the two SDKs
+     * also signed the same form differently.
+     */
     addDateField(fieldId: string, fieldLabel: string, isRequired: boolean = false, minDate?: string, maxDate?: string): this {
         return this.addField('date', fieldId, fieldLabel, {
             required: isRequired,
-            min: minDate ? new Date(minDate).getTime() : undefined,
-            max: maxDate ? new Date(maxDate).getTime() : undefined
+            minDate,
+            maxDate
         });
     }
 
-    addSelectField(fieldId: string, fieldLabel: string, isRequired: boolean = false, options: Array<{ label: string; value: unknown }>): this {
+    /**
+     * One choice among several.
+     *
+     * `display` is a presentation preference, not a different field: `radio`
+     * lays every option flat in the form, `dropdown` (the default) opens a
+     * selection sheet. Pick `radio` for a handful of options the user should
+     * be able to compare at a glance, `dropdown` when there are many. A
+     * client that does not know the key falls back to the sheet.
+     */
+    addSelectField(fieldId: string, fieldLabel: string, isRequired: boolean = false, options: Array<{ label: string; value: unknown }>, display?: SelectDisplay): this {
         if (!Array.isArray(options) || options.length === 0) {
             throw new EmptyCollectionError('Select field options', 'Select field must have at least one option');
+        }
+        if (display !== undefined && display !== 'dropdown' && display !== 'radio') {
+            throw new InvalidParameterError('display', display, "display must be 'dropdown' or 'radio'");
         }
 
         return this.addField('select', fieldId, fieldLabel, {
             required: isRequired,
-            options
+            options,
+            // Omise quand elle n'est pas posee : le client applique son defaut.
+            ...(display === undefined ? {} : { display })
         });
     }
 
-    addPhotoField(fieldId: string, fieldLabel: string, isRequired: boolean = false, formats: string[] = ['jpeg', 'png'], live: boolean = false): this {
+    /**
+     * @param options.multiple  accept more than one photo in this field.
+     * @param options.maxCount  upper bound when `multiple` is set.
+     * @param options.source    `record` (camera only), `library` (gallery only)
+     *   or `both` (default). Use `record` when the photo must have been taken
+     *   now rather than picked from the gallery.
+     */
+    addPhotoField(
+        fieldId: string,
+        fieldLabel: string,
+        isRequired: boolean = false,
+        formats: string[] = ['jpeg', 'png'],
+        live: boolean = false,
+        options: MediaFieldOptions & { multiple?: boolean; maxCount?: number; source?: CaptureSource } = {}
+    ): this {
         if (!formats || formats.length === 0) {
             throw new EmptyCollectionError('Photo field formats', 'Photo field must specify at least one format');
         }
@@ -215,18 +447,113 @@ export class FormView extends BaseView {
         return this.addField('photo', fieldId, fieldLabel, {
             required: isRequired,
             accept: acceptedFormats,
-            live
+            live,
+            ...options
         });
     }
 
-    addFileField(fieldId: string, fieldLabel: string, isRequired: boolean = false, formats: string[]): this {
+    addFileField(
+        fieldId: string,
+        fieldLabel: string,
+        isRequired: boolean = false,
+        formats: string[],
+        options: MediaFieldOptions & { multiple?: boolean; maxCount?: number } = {}
+    ): this {
         if (!formats || formats.length === 0) {
             throw new EmptyCollectionError('File field formats', 'File field must specify at least one format');
         }
 
         return this.addField('file', fieldId, fieldLabel, {
             required: isRequired,
-            accept: formats
+            accept: formats,
+            ...options
+        });
+    }
+
+    /**
+     * Adds a voice-recording field.
+     *
+     * The captured file travels back inside the normal multipart form submission
+     * under this `fieldId` — there is no separate upload endpoint.
+     *
+     * @param options.maxDuration seconds. Recommended: it is the only thing that
+     *   bounds how large the upload gets. Voice at the renderer's default
+     *   encoding runs roughly 0.5 MB per minute.
+     * @param options.minDuration seconds. Rejects an accidental tap-and-release.
+     * @param options.source      `record` (microphone only), `library` (pick an
+     *   existing file) or `both` (default).
+     * @param options.formats     accepted container extensions. Defaults cover
+     *   what iOS and Android record natively.
+     */
+    addAudioField(
+        fieldId: string,
+        fieldLabel: string,
+        isRequired: boolean = false,
+        options: MediaFieldOptions & {
+            maxDuration?: number;
+            minDuration?: number;
+            source?: CaptureSource;
+            multiple?: boolean;
+            maxCount?: number;
+            maxSize?: number;
+            formats?: string[];
+        } = {}
+    ): this {
+        const { formats = ['m4a', 'mp3', 'wav', 'aac'], ...params } = options;
+        if (formats.length === 0) {
+            throw new EmptyCollectionError('Audio field formats', 'Audio field must specify at least one format');
+        }
+
+        return this.addField('audio', fieldId, fieldLabel, {
+            required: isRequired,
+            accept: FileFormatManager.getMimeTypes(formats),
+            ...params
+        });
+    }
+
+    /**
+     * Adds a video-recording field.
+     *
+     * Like audio, the captured file rides the normal multipart submission under
+     * this `fieldId`.
+     *
+     * `maxDuration` is REQUIRED here. Video is the one field type that can
+     * produce a payload large enough to fail the provider's request body limit,
+     * and duration × quality is what bounds it — see {@link VideoQuality} for
+     * the per-minute sizes each setting implies.
+     *
+     * @param options.maxDuration seconds. Required.
+     * @param options.quality     capture ceiling (default `medium`).
+     * @param options.source      `record` (camera only), `library` or `both`
+     *   (default).
+     * @param options.maxSize     bytes. The renderer refuses to upload a file
+     *   past this and reports a field error instead of failing mid-request.
+     */
+    addVideoField(
+        fieldId: string,
+        fieldLabel: string,
+        isRequired: boolean = false,
+        options: MediaFieldOptions & {
+            maxDuration: number;
+            minDuration?: number;
+            quality?: VideoQuality;
+            source?: CaptureSource;
+            multiple?: boolean;
+            maxCount?: number;
+            maxSize?: number;
+            formats?: string[];
+        }
+    ): this {
+        const { formats = ['mp4', 'mov', 'webm'], ...params } = options || {};
+        if (formats.length === 0) {
+            throw new EmptyCollectionError('Video field formats', 'Video field must specify at least one format');
+        }
+
+        return this.addField('video', fieldId, fieldLabel, {
+            required: isRequired,
+            quality: 'medium',
+            accept: FileFormatManager.getMimeTypes(formats),
+            ...params
         });
     }
 
@@ -303,6 +630,33 @@ export class FormView extends BaseView {
      *     .addSeparator()
      *     .addEmailField('email', 'Email', true);
      */
+    /**
+     * Vertical breathing space between fields — nothing is drawn.
+     *
+     * Complements {@link addSeparator}, which draws a rule: use a separator to
+     * say "a new group starts here", a spacer to let an existing group breathe
+     * without claiming a boundary.
+     *
+     * Three steps only, so a form cannot drift into arbitrary spacing: `sm`,
+     * `md` (default), `lg`. What each one measures is the client's business —
+     * a provider asks for a gap, not for a number of pixels.
+     *
+     * Carries no value, is never submitted, and is skipped by validation.
+     */
+    addSpacer(size: SpacerSize = 'md'): this {
+        if (!['sm', 'md', 'lg'].includes(size))
+            throw new InvalidParameterError('size', size, "size must be 'sm', 'md' or 'lg'");
+
+        // Id derived from the position, like addParagraph: a timestamp would
+        // make two identical forms serialize — and therefore sign — differently.
+        return this.addField(
+            'spacer',
+            `spacer-${(this.content as FormContent).fields.length}`,
+            '',
+            { size }
+        );
+    }
+
     addSeparator(fieldId?: string, label: string = ''): this {
         const separatorId = fieldId || `separator-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         return this.addField('separator', separatorId, label, {});
@@ -361,7 +715,13 @@ export class FormView extends BaseView {
             }
             // Simple checkbox (true/false) or all other fields: use value
             else {
-                this.updateField(fieldId, { value: value as any });
+                try {
+                    this.updateField(fieldId, { value: value as any });
+                } catch (e) {
+                    // A refused value is one error among the others this
+                    // method reports, not an exception out of the loop.
+                    errors.push(e instanceof Error ? e.message : String(e));
+                }
             }
         });
 
@@ -400,6 +760,31 @@ export class FormView extends BaseView {
     /**
      * Gets a field by its ID
      */
+    /**
+     * Canonicalises every field before the view is serialised.
+     *
+     * Ordering at write time is not enough on its own: `getField` hands back
+     * the stored object, so a caller can set a key on it directly and land it
+     * wherever `Object.assign` would have — after the fact, at the end. The
+     * order is a wire contract, so it is settled here, at the one point every
+     * payload goes through, whatever route the field took to get here.
+     */
+    override build(): Record<string, unknown> {
+        const fields = (this.content as FormContent).fields;
+        for (let i = 0; i < fields.length; i++) {
+            const field = orderFieldKeys(fields[i] as EmittedField);
+            fields[i] = field;
+            // Same reasoning as the order: a value written straight onto the
+            // object `getField` returned skipped `updateField`, so the media
+            // path rule is checked once more here, where every field ends up.
+            const problems = validateStoredMediaPaths(field.fieldType, field.fieldId, field.value);
+            if (problems.length > 0) {
+                throw new FieldValidationError(field.fieldId, field.fieldType, problems.map(e => e.message));
+            }
+        }
+        return super.build();
+    }
+
     getField(fieldId: string): (FormFieldParams & { fieldType: string; fieldId: string; fieldLabel: string }) | undefined {
         return (this.content as FormContent).fields.find(field => field.fieldId === fieldId);
     }
@@ -431,7 +816,23 @@ export class FormView extends BaseView {
             return Err(`Field '${fieldId}' not found in form '${this.id}'`);
         }
 
-        Object.assign(field, updates);
+        // Rebuild rather than mutate: `Object.assign` appends a key the field
+        // did not already carry, so a late `setFieldValue` used to place
+        // `value` last while Python emits it first.
+        const fields = (this.content as FormContent).fields;
+        const merged = orderFieldKeys({ ...field, ...updates } as EmittedField);
+
+        // A value set after the fact takes the same road as one set at build
+        // time: `addField` refused an absolute media path, and this method
+        // used to let one straight through — `setFieldValue` and `injectData`
+        // both land here.
+        if ('value' in updates) {
+            const problems = validateStoredMediaPaths(merged.fieldType, fieldId, merged.value);
+            if (problems.length > 0) {
+                throw new FieldValidationError(fieldId, merged.fieldType, problems.map(e => e.message));
+            }
+        }
+        fields[fields.indexOf(field)] = merged;
 
         // Update the validation
         if (this.fieldValidations.has(fieldId)) {

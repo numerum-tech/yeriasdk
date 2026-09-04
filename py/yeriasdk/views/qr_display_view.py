@@ -43,7 +43,6 @@ class QRDisplayView(BaseView):
 
         self.content = {
             "title": title,
-            "intro": "",
             "submit": None,
             "qrImage": "",
             "qrTitle": "",

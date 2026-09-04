@@ -131,8 +131,11 @@ demo.get('/', (req: Request, res: Response) => {
     const grid = new ActionGridView('home', 'Yeria SDK - Tous les types de vues');
     grid.setColumns(3);
     grid.setSpacing(16);
-    grid.addAction('/api/forms', 'FormView', 'Formulaires interactifs avec validation et divers types de champs', ICON('edit-document-outline'));
+    grid.addAction('/api/forms/contact', 'Fiche contact', 'L\'exemple publie sur la page d\'accueil : nom, prenom, e-mail', ICON('account-circle-outline'));
+    grid.addAction('/api/forms', 'FormView', 'Index des types de champs, par famille : texte, nombres, choix, images, fichiers, enregistrements, localisation', ICON('edit-document-outline'));
+    grid.addAction('/api/forms/rich', 'Formulaire riche', 'Paragraphes nommes, separateur, espaces, readonly/disabled, medias deja fournis, second bouton', ICON('mic-none-outline'));
     grid.addAction('/api/readers', 'ReaderView', 'Affichage de contenu riche avec plusieurs types d\'éléments', ICON('menu-book-outline'));
+    grid.addAction('/api/readers/paged/1', 'Lecteur paginé', 'Document en trois pages : flèches et indicateur « Page 1 / 3 » dessinés par le client', ICON('menu-book-outline'));
     grid.addAction('/api/cards', 'CardView', 'Vue fiche produit compacte avec statistiques et actions', ICON('credit-card-outline'));
     grid.addAction('/api/actions', 'ActionListView', 'Liste verticale d\'éléments actionnables avec icônes', ICON('list-alt-outline'));
     grid.addAction('/api/action-grid', 'ActionGridView', 'Disposition en grille d\'éléments actionnables', ICON('apps'));
@@ -174,6 +177,7 @@ demo.get('/api', (req: Request, res: Response) => {
         basePath: BASE_PATH || '/',
         endpoints: {
             forms: '/api/forms',
+            'forms-contact': '/api/forms/contact',
             readers: '/api/readers',
             actions: '/api/actions',
             'action-grid': '/api/action-grid',

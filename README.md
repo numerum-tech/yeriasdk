@@ -3,6 +3,7 @@
 An SDK for generating dynamic interfaces for the Yeria application ecosystem.
 
 🌐 Website: [yeria.app](https://yeria.app)
+📱 Android app: [Yeria on Google Play](https://play.google.com/store/apps/details?id=com.numerum.yeria.app) — the renderer these views are built for.
 
 ## 📦 Language Ports
 
@@ -46,11 +47,17 @@ All language ports share the same core features:
 
 ## 📚 Documentation
 
-Each language port has its own complete documentation:
+**The reference lives at [yeria.app/docs](https://yeria.app/docs)** — every view,
+the provider integration path, and the navigation model, in English and French.
+
+The same pages ship here under [`specs/en`](./specs/en) and
+[`specs/fr`](./specs/fr). They are HTML body fragments: GitHub shows them as
+source, so read them on the site unless you are consuming them with a tool.
+
+Per language port:
 
 - [JavaScript/TypeScript Documentation](./js/README.md)
 - [Python Documentation](./py/README.md)
-- [Provider Integration](./docs/provider-integration.md)
 - [Deeplink Implementation Specification](./docs/deeplink-implementation.md)
 
 ## 🏗️ Architecture

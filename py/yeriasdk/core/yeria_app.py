@@ -97,12 +97,12 @@ class YeriaApp:
         request. When you cannot sign (no key / app), use the keyless
         ``YeriaUI.error(...)`` instead — the mobile accepts an unsigned
         ``{"error": {...}}`` body too."""
-        import json as _json
         import time as _time
         from .provider_error import build_provider_error
+        from ..utils.signing_json import dumps_for_signing
         body = build_provider_error(code, message, status, invalid_params)
         decoded = {"appId": self.config.app_id, "timestamp": int(_time.time() * 1000), **body}
-        payload = _json.dumps(decoded, separators=(",", ":"))
+        payload = dumps_for_signing(decoded)
         return SignedEnvelope(payload=payload, signature=self._signer.sign_payload(payload))
 
     def verify_integrity(self, envelope: SignedEnvelope) -> bool:
@@ -139,7 +139,7 @@ class YeriaApp:
         self._envelope_verifier.set_public_key(self._signer.get_service_public_key())
         return rotated
 
-    def fetch_user_details(self, user_service_token: str, timeout: int = 5) -> UserDetails:
+    def fetch_user_details(self, user_service_token: str, timeout: Optional[int] = None) -> UserDetails:
         """Fetch a Yeria user's details, authorized by the user's own live
         service token."""
         return self._platform.fetch_user_details(user_service_token, timeout=timeout)

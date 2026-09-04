@@ -1,0 +1,98 @@
+<p>Reference for the Yeria SDK, available for <strong>JavaScript/TypeScript</strong> (<code class="ys-code">@numerum-tech/yeriasdk</code>) and <strong>Python</strong> (<code class="ys-code">yeriasdk</code>). Both implementations sign byte-identically, so a view built in one verifies in the other.</p>
+
+<p>Each component specification includes:</p>
+
+<ul><li><strong>Component Description</strong>: Purpose, use cases, and design principles</li><li><strong>Fields Description Table</strong>: Complete field reference with types, requirements, and descriptions</li><li><strong>Sample Code</strong>: Practical examples demonstrating component usage</li></ul>
+
+<h2 id="start-here">Start here</h2>
+
+<ul><li><strong><a href="/docs/integration">Provider integration</a></strong> — end to end: generate your Ed25519 keypair, register it, verify inbound user tokens, fetch user profiles. Read this first.</li><li><strong><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a></strong> — the two SDK entry points. <code class="ys-code">YeriaUI</code> builds views (keyless); <code class="ys-code">YeriaApp</code> holds your key and signs.</li><li><strong><a href="/docs/navigation">Navigation</a></strong> — the path between your screens: what the back gesture lands on, when a result replaces the form that produced it, and how a paginated sequence is driven. Also lists what the clients do NOT honour.</li></ul>
+
+<h2 id="view-components">View Components</h2>
+
+<h3 id="form-components">Form Components</h3>
+
+<ul><li><strong><a href="/docs/formview">FormView</a></strong> - Dynamic forms with various field types, validation rules, and submission actions. Supports text, email, password, number, date, select, file uploads, GPS coordinates, and more.</li></ul>
+
+<h3 id="content-display-components">Content Display Components</h3>
+
+<ul><li><strong><a href="/docs/readerview">ReaderView</a></strong> - Rich content display for reading. Supports paragraphs, images, markdown content, lists, links, tables, code blocks, quotes, and custom elements.</li></ul>
+
+<ul><li><strong><a href="/docs/cardview">CardView</a></strong> - Compact "product sheet" view highlighting a single item with stats, sections, and actions. Ideal for product information, user profiles, or event details.</li></ul>
+
+<ul><li><strong><a href="/docs/carouselview">CarouselView</a></strong> - Carousel/slideshow component for showcasing featured content, announcements, or promotions. Supports autoplay, looping, and configurable display settings.</li></ul>
+
+<ul><li><strong><a href="/docs/timelineview">TimelineView</a></strong> - Chronological timeline display for tracking progress, onboarding steps, or activity feeds. Supports status indicators (pending, active, completed, error).</li></ul>
+
+<ul><li><strong><a href="/docs/mediaview">MediaView</a></strong> - Audio and video playlist component for media playback. Supports multiple sources, posters, and playback controls.</li></ul>
+
+<ul><li><strong><a href="/docs/mapview">MapView</a></strong> - Geographic map display with markers, viewport configuration, controls, and overlays. Backend provides data while renderer handles styling and interactions.</li></ul>
+
+<h3 id="action-components">Action Components</h3>
+
+<ul><li><strong><a href="/docs/actionlistview">ActionListView</a></strong> - Vertical list of action items for navigation menus, feature lists, or command centers. Each action can have title, description, thumbnail, and metadata.</li></ul>
+
+<ul><li><strong><a href="/docs/actiongridview">ActionGridView</a></strong> - Grid layout of action items for dashboards or icon-based navigation. Supports configurable columns (1-6) and spacing.</li></ul>
+
+<ul><li><strong><a href="/docs/icongridview">IconGridView</a></strong> - Compact icon grid for dense, icon-first navigation.</li></ul>
+
+<h3 id="qr-code-components">QR Code Components</h3>
+
+<ul><li><strong><a href="/docs/qrscanview">QRScanView</a></strong> - QR code scanner interface. Mobile app handles scanner implementation while view describes what to scan and where to submit. Supports auto-submit, validation, and preview modes.</li></ul>
+
+<ul><li><strong><a href="/docs/qrdisplayview">QRDisplayView</a></strong> - QR code display component for sharing access codes, tickets, or payment information. Supports multiple QR codes with individual titles, descriptions, and configuration options.</li></ul>
+
+<h3 id="message-components">Message Components</h3>
+
+<ul><li><strong><a href="/docs/messageview">MessageView</a></strong> - Message, notification, and alert display component. Supports different severity levels (info, success, warning, error) with primary and secondary actions. Can be dismissible or require user interaction.</li></ul>
+
+<h3 id="header-text">Header Text</h3>
+
+<p>Every view carries a short line of context under its title, set with <code class="ys-code">setIntro(text)</code> and carried by the <code class="ys-code">intro</code> key. CardView adds <code class="ys-code">setDescription(text)</code> for its long-form body paragraph, which is a different role. On CardView and CarouselView the key used to be named <code class="ys-code">subtitle</code>: <code class="ys-code">setSubtitle(text)</code> is kept as an alias of <code class="ys-code">setIntro</code> and writes the same key. All header texts share one contract:</p>
+
+<ul><li>The text is trimmed, and an empty or blank value is refused with an <code class="ys-code">InvalidParameterError</code>. A header line is set or it does not exist — there is no "empty" state.</li><li>A setter you never call emits no key at all. The client draws nothing for a key it does not receive, so an unset intro costs no vertical space.</li></ul>
+
+<h2 id="usage">Usage</h2>
+
+<p>Each specification document provides:</p>
+
+<ol><li><strong>Complete field reference</strong> - All available fields with their types, requirements, and descriptions</li><li><strong>Practical examples</strong> - Real-world code samples showing how to use each component</li><li><strong>Best practices</strong> - Design principles and conventions for each component type</li></ol>
+
+<h2 id="quick-start">Quick Start</h2>
+
+<p>Building a view needs no key; signing it does. That is why the two steps sit on two different objects.</p>
+
+<pre class="ys-codeblock" data-lang="javascript"><code>import { YeriaUI, YeriaApp } from '@numerum-tech/yeriasdk';
+
+// Holds your Ed25519 private key — signs, verifies, talks to Yeria.
+const app = new YeriaApp({
+    appId: 'my-app',
+    baseUrl: process.env.YERIA_BASE_URL,
+    privateKey: process.env.SERVICE_ED25519_PRIVATE_KEY,
+});
+
+// Keyless factory — never instantiated, used like Math or JSON.
+const form = YeriaUI.createFormView('registration', 'User Registration')
+    .addTextField('name', 'Name', true)
+    .submitButton('Register', 'POST');
+
+// Sign it into a v3 envelope: { payload, signature }
+res.json(app.serve(form));</code></pre>
+
+<p>Python, same protocol:</p>
+
+<pre class="ys-codeblock" data-lang="python"><code>from yeriasdk import YeriaApp, YeriaAppConfig, YeriaUI
+
+app = YeriaApp(YeriaAppConfig(
+    app_id="my-app",
+    base_url=os.environ["YERIA_BASE_URL"],
+    private_key=os.environ["SERVICE_ED25519_PRIVATE_KEY"],
+))
+
+form = (YeriaUI.create_form_view("registration", "User Registration")
+        .add_text_field("name", "Name", True)
+        .submit_button("Register", "POST"))
+
+envelope = app.serve(form)</code></pre>
+
+<p>For detailed information about each component, refer to the individual specification documents listed above.</p>

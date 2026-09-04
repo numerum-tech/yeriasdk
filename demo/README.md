@@ -124,8 +124,11 @@ http://localhost:3000/api
 
 #### QR Codes
 - `GET /api/qr` - List all QR demos
-- `GET /api/qr/:qrId` - Get specific QR JSON
-- `POST /api/qr/process` - Process scanned QR data
+- `GET /api/qr/scan/auto` - QRScanView with auto-submission (no preview, no button)
+- `POST /api/qr/scan/auto` - Handles the auto-submitted scan
+- `GET /api/qr/scan/preview` - QRScanView with a read-only preview and a confirm button
+- `POST /api/qr/scan/preview` - Handles the confirmed scan
+- `GET /api/qr/display` - QRDisplayView with a QR code served as base64 PNG
 
 #### Messages
 - `GET /api/messages` - List all message demos

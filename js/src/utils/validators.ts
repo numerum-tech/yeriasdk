@@ -1,5 +1,60 @@
 import { FieldValidation, ValidationResult, FormFieldParams, ValidationError as ValidationErrorType, createValidationError } from '../types';
 
+/**
+ * A media `value` is a path RELATIVE to the provider's service base.
+ *
+ * The renderer resolves it against that base and refuses anything absolute —
+ * `http(s)://` and `//host` (no arbitrary external host, no cleartext),
+ * `file://` (would read the device's own files) and `data:` (untrusted inline
+ * payload). It refuses by displaying NOTHING, which is the worst way for a
+ * provider to learn the rule, so the SDKs refuse it here instead, when the
+ * view is built. A CDN is reached by answering the relative URL with a 3xx.
+ *
+ * The rule is "no scheme and no network path", not a list of schemes: a
+ * `javascript:` or `mailto:` value, or a scheme nobody has thought of, resolves
+ * away from the service base just the same. And a backslash counts as a
+ * slash, because the web renderer resolves with WHATWG URL semantics where
+ * `\\host/a.jpg` and `https:\\host` are absolute.
+ */
+const SCHEME_PREFIX = /^[a-z][a-z0-9+.-]*:/;
+// WHATWG strips leading/trailing C0 controls and every tab or newline BEFORE
+// parsing, so `\x01https://host` and `ht\ntps://host` are absolute in a
+// browser while a plain prefix check reads them as relative. A media path
+// never legitimately carries a control character: refuse the value outright.
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
+
+export const MEDIA_FIELD_TYPES = ['photo', 'file', 'audio', 'video'];
+
+/**
+ * The stored-media-path rule, on its own so that every path a `value` can
+ * take runs it: `addField` at build time, and `updateField` — hence
+ * `setFieldValue` and `injectData` — when a value is set after the fact.
+ * Returns no error for a field that is not a media field, or has no value.
+ */
+export function validateStoredMediaPaths(fieldType: string, fieldId: string, value: unknown): ReturnType<typeof createValidationError>[] {
+    const errors: ReturnType<typeof createValidationError>[] = [];
+    // `null` is "no value", as `None` is in Python; neither reaches the wire.
+    if (!MEDIA_FIELD_TYPES.includes(fieldType) || value === undefined || value === null) return errors;
+    const paths = Array.isArray(value) ? value : [value];
+    for (const path of paths) {
+        if (typeof path !== 'string' || !isRelativeAssetPath(path)) {
+            errors.push(createValidationError(
+                `Stored media path '${String(path)}' must be relative to the service base (a scheme, a //host and their backslash forms are refused)`,
+                fieldId
+            ));
+        }
+    }
+    return errors;
+}
+
+export function isRelativeAssetPath(value: string): boolean {
+    if (CONTROL_CHARACTER.test(value)) return false;
+    const trimmed = value.trim().toLowerCase().replace(/\\/g, '/');
+    if (trimmed.length === 0) return false;
+    if (trimmed.startsWith('//')) return false;
+    return !SCHEME_PREFIX.test(trimmed);
+}
+
 export class DataSanitizer {
     /**
      * Sanitizes user input to prevent injection attacks
@@ -42,10 +97,21 @@ export class DataSanitizer {
         return emailRegex.test(email);
     }
 
+    /**
+     * A URL the client may be asked to open — so only the two schemes it can
+     * meaningfully open are accepted.
+     *
+     * `new URL(...)` alone was the whole test, and it parses anything with a
+     * scheme: `javascript:alert(1)`, `data:text/html,...` and `vbscript:` all
+     * passed as valid values for a `url` field, which the renderer then puts
+     * in front of the user. Python refused them by requiring a network
+     * location, incidentally rather than by rule; both now state the rule.
+     */
     static validateURL(url: string): boolean {
         try {
-            new URL(url);
-            return true;
+            const parsed = new URL(url);
+            return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+                && parsed.host.length > 0;
         } catch {
             return false;
         }
@@ -114,8 +180,8 @@ export class FieldValidator {
             errors.push(createValidationError('Field ID is required', fieldId));
         }
 
-        // Separator fields don't require a label
-        if (fieldType !== 'separator' && (!fieldLabel || fieldLabel.trim() === '')) {
+        // Display-only fields (separator, paragraph) carry no label.
+        if (!['separator', 'paragraph', 'spacer'].includes(fieldType) && (!fieldLabel || fieldLabel.trim() === '')) {
             errors.push(createValidationError('Field label is required', fieldId));
         }
 
@@ -123,8 +189,10 @@ export class FieldValidator {
             errors.push(createValidationError('Field type is required', fieldId));
         }
 
-        // Skip validation rules for separator fields (they're visual elements only)
-        if (fieldType === 'separator') {
+        // Skip validation rules for the purely visual types. NOTE: 'paragraph'
+        // is skipped by the Python SDK here but not by this one — a divergence
+        // that predates this list and is left as is on purpose.
+        if (['separator', 'spacer'].includes(fieldType)) {
             return {
                 isValid: errors.length === 0,
                 errors,
@@ -164,6 +232,15 @@ export class FieldValidator {
                 errors.push(createValidationError('Accept must be a non-empty array for file fields', fieldId));
             }
 
+            // Multi-capture validation (photo / file / audio / video)
+            if (params.maxCount !== undefined) {
+                if (!Number.isInteger(params.maxCount) || params.maxCount < 1) {
+                    errors.push(createValidationError('maxCount must be a positive integer', fieldId));
+                } else if (params.maxCount > 1 && params.multiple !== true) {
+                    warnings.push(createValidationError('maxCount is ignored unless multiple is true', fieldId));
+                }
+            }
+
             // Dependency validation
             if (params.dependencies && (!Array.isArray(params.dependencies) ||
                 params.dependencies.some(dep => !dep || dep.trim() === ''))) {
@@ -171,30 +248,42 @@ export class FieldValidator {
             }
         }
 
+        // Ces controles de format ne portent que sur des valeurs textuelles
+        // (email, URL, telephone...). Depuis que `value` peut aussi etre une
+        // liste d'URL de medias deja detenus par le fournisseur, on isole le
+        // cas scalaire une fois pour toutes plutot que de le tester partout.
+        const scalarValue = typeof params?.value === 'string' ? params.value : undefined;
+
+        // A stored media path must be relative to the service base. Checked
+        // before the switch rather than as a case of it: `photo` and `file`
+        // already have a case further down, and a second one silently shadows
+        // it — the accepted-formats check simply stopped running.
+        errors.push(...validateStoredMediaPaths(fieldType, fieldId, params?.value));
+
         // Field-type-specific validation
         switch (fieldType) {
             case 'email':
-                if (params?.value && !DataSanitizer.validateEmail(params.value)) {
+                if (scalarValue && !DataSanitizer.validateEmail(scalarValue)) {
                     errors.push(createValidationError('Invalid email format', fieldId));
                 }
                 break;
 
             case 'url':
-                if (params?.value && !DataSanitizer.validateURL(params.value)) {
+                if (scalarValue && !DataSanitizer.validateURL(scalarValue)) {
                     errors.push(createValidationError('Invalid URL format', fieldId));
                 }
                 break;
 
             case 'phone':
-                if (params?.value && !DataSanitizer.validatePhoneNumber(params.value)) {
+                if (scalarValue && !DataSanitizer.validatePhoneNumber(scalarValue)) {
                     errors.push(createValidationError('Invalid phone number format', fieldId));
                 }
                 break;
 
             case 'gps':
-                if (params?.value) {
+                if (scalarValue) {
                     try {
-                        const coords = JSON.parse(params.value);
+                        const coords = JSON.parse(scalarValue);
                         if (!DataSanitizer.validateCoordinates(coords.lat, coords.lon)) {
                             errors.push(createValidationError('Invalid GPS coordinates', fieldId));
                         }
@@ -208,8 +297,8 @@ export class FieldValidator {
                 if (params?.minLength !== undefined && params.minLength < 8) {
                     warnings.push(createValidationError('Password minimum length should be at least 8 characters for security', fieldId));
                 }
-                if (params?.value) {
-                    const passwordResult = DataSanitizer.validatePassword(params.value, params?.minLength || 8);
+                if (scalarValue) {
+                    const passwordResult = DataSanitizer.validatePassword(scalarValue, params?.minLength || 8);
                     if (!passwordResult.valid && passwordResult.error) {
                         errors.push(createValidationError(passwordResult.error, fieldId));
                     }
@@ -298,6 +387,63 @@ export class FieldValidator {
                     });
                 }
                 break;
+
+            case 'audio':
+            case 'video': {
+                if (!params?.accept || params.accept.length === 0) {
+                    errors.push(createValidationError('Recording fields must specify accepted types', fieldId));
+                }
+
+                // Duration is what bounds the upload size. Video can realistically
+                // exceed a provider's request body limit, so there it is mandatory;
+                // for audio a missing bound is only worth a warning.
+                if (params?.maxDuration === undefined) {
+                    if (fieldType === 'video') {
+                        errors.push(createValidationError(
+                            'Video fields must specify maxDuration (seconds) — it is what bounds the upload size',
+                            fieldId
+                        ));
+                    } else {
+                        warnings.push(createValidationError(
+                            'Audio field has no maxDuration; a recording can then grow unbounded',
+                            fieldId
+                        ));
+                    }
+                } else if (!Number.isFinite(params.maxDuration) || params.maxDuration <= 0) {
+                    errors.push(createValidationError('maxDuration must be a positive number of seconds', fieldId));
+                }
+
+                if (params?.minDuration !== undefined) {
+                    if (!Number.isFinite(params.minDuration) || params.minDuration < 0) {
+                        errors.push(createValidationError('minDuration must be a non-negative number of seconds', fieldId));
+                    } else if (params.maxDuration !== undefined && params.minDuration > params.maxDuration) {
+                        errors.push(createValidationError('minDuration cannot be greater than maxDuration', fieldId));
+                    }
+                }
+
+                if (params?.source !== undefined && !['record', 'library', 'both'].includes(params.source)) {
+                    errors.push(createValidationError(
+                        `Invalid source '${params.source}' (expected 'record', 'library' or 'both')`,
+                        fieldId
+                    ));
+                }
+
+                if (params?.maxSize !== undefined && (!Number.isFinite(params.maxSize) || params.maxSize <= 0)) {
+                    errors.push(createValidationError('maxSize must be a positive number of bytes', fieldId));
+                }
+
+                if (params?.quality !== undefined) {
+                    if (fieldType === 'audio') {
+                        warnings.push(createValidationError('quality only applies to video fields and is ignored here', fieldId));
+                    } else if (!['low', 'medium', 'high'].includes(params.quality)) {
+                        errors.push(createValidationError(
+                            `Invalid quality '${params.quality}' (expected 'low', 'medium' or 'high')`,
+                            fieldId
+                        ));
+                    }
+                }
+                break;
+            }
 
             case 'hidden':
                 // Hidden fields must have a value

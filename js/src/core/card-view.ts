@@ -16,7 +16,7 @@ import { YeriaLink } from './yeria-link';
 /**
  * Builds a Card SGUI view — a compact "product sheet" spotlighting a single item.
  *
- * Header, badge and image are set via `setSubtitle`/`setDescription`/`setBadge`/
+ * Header, badge and image are set via `setIntro`/`setDescription`/`setBadge`/
  * `setImage`; `addStat`, `addSection` and `addAction` fill the highlight
  * metrics, body sections and footer buttons.
  *
@@ -42,8 +42,6 @@ export class CardView extends BaseView {
 
         this.content = {
             title,
-            subtitle: '',
-            description: '',
             badge: undefined,
             image: undefined,
             stats: [],
@@ -53,16 +51,24 @@ export class CardView extends BaseView {
         } as CardContent;
     }
 
-    // Sets the small subtitle displayed under the main title.
+    // Ligne de contexte sous le titre.
+    setIntro(intro: string): this {
+        // Même contrat que partout ailleurs : un texte d'en-tête se pose ou ne
+        // se pose pas. Stocker '' faisait réserver au renderer une ligne vide.
+        return this.setIntroText('intro', intro);
+    }
+
+    /**
+     * Nom historique de {@link setIntro}, conservé : la carte disait
+     * `subtitle` là où les onze autres vues disent `intro`. Écrit la même clé.
+     */
     setSubtitle(subtitle: string): this {
-        (this.content as CardContent).subtitle = subtitle.trim();
-        return this;
+        return this.setIntro(subtitle);
     }
 
     // Provides the long-form description for the card body.
     setDescription(description: string): this {
-        (this.content as CardContent).description = description.trim();
-        return this;
+        return this.setIntroText('description', description);
     }
 
     // Displays a compact badge (e.g., "Nouveau") above the title.
@@ -93,6 +99,15 @@ export class CardView extends BaseView {
     }
 
     // Adds a key metric row (label/value) in the highlight area.
+    /**
+     * Names the stats block. Optional: with no heading the grid is drawn
+     * bare, exactly as a section with no `heading` is. The client never
+     * invents a title of its own.
+     */
+    setStatsHeading(heading: string): this {
+        return this.setIntroText('statsHeading', heading);
+    }
+
     addStat(label: string, value: string): this {
         const trimmedLabel = label.trim();
         const trimmedValue = value.trim();

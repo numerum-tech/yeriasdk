@@ -5,6 +5,7 @@
 A stateless backend library for building views that are sent to renderers (mobile or web). This is the Python port of the TypeScript Yeria SDK.
 
 🌐 Website: [yeria.app](https://yeria.app)
+📱 Android app: [Yeria on Google Play](https://play.google.com/store/apps/details?id=com.numerum.yeria.app) — the renderer these views are built for.
 
 ## Features
 
