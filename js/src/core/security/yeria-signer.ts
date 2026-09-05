@@ -68,19 +68,29 @@ export class YeriaSigner {
     }
 
     /** Sign a notification into a SecureNotificationResponse (signature over the payload bytes). */
-    signNotification(notification: Notification, appId: string, timestamp: number = Date.now()): SecureNotificationResponse {
+    signNotification(
+        notification: Notification,
+        appId: string,
+        timestamp: number = Date.now(),
+        devKeyId?: string
+    ): SecureNotificationResponse {
         const notificationJson = notification.toJSON();
-        const payload = stringifyForSigning({
-            notification: notificationJson,
-            timestamp,
-            appId
-        });
+        // `devKeyId` n'entre dans la charge signee QUE s'il existe : une
+        // notification de production garde exactement la forme qu'elle avait,
+        // sinon toutes celles deja en circulation cesseraient de verifier.
+        const payload = stringifyForSigning(
+            devKeyId
+                ? { notification: notificationJson, timestamp, appId, devKeyId }
+                : { notification: notificationJson, timestamp, appId }
+        );
 
-        return {
+        const signed: SecureNotificationResponse = {
             appId,
             signature: this.signPayload(payload),
             timestamp,
             notification: notificationJson
         };
+        if (devKeyId) signed.devKeyId = devKeyId;
+        return signed;
     }
 }

@@ -1,4 +1,4 @@
-<p>One HTTP endpoint, one view, one test in the app. This page takes the shortest path; the protocol details live in <a href="/docs/integration">Provider integration</a>.</p>
+<p>This page gets you to one endpoint serving one view, tested in the app, by the shortest route. The protocol details are in <a href="/docs/integration">Provider integration</a>.</p>
 
 <p>What you need: a backend reachable over HTTPS from a phone, Node 18+ or Python 3.10+, and a Yeria account.</p>
 
@@ -31,7 +31,7 @@ openssl pkey -in service_private.pem -pubout -out service_public.pem</code></pre
     <pre class="ys-codeblock" data-panel="py" hidden><code>pip install yeriasdk</code></pre>
 </div>
 
-<p>No native dependency: installing compiles nothing. Ed25519 signing relies on each platform's standard library.</p>
+<p>The install compiles nothing. Ed25519 signing uses each platform's standard library, so there is no native dependency to build.</p>
 
 <h2 id="configurer">4. Configure the backend</h2>
 
@@ -100,7 +100,7 @@ def topup():
 
 <h2 id="jeton">6. Verify the user token</h2>
 
-<p>The app calls your endpoint with a bearer token Yeria minted for your service. You verify it yourself: the SDK ships helpers, not middleware.</p>
+<p>The app calls your endpoint with a bearer token Yeria minted for your service. You verify it yourself. The SDK gives you helpers for that; it does not hand you a middleware.</p>
 
 <pre class="ys-codeblock" data-lang="js"><code>const auth = req.headers.authorization || '';
 const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';
@@ -110,16 +110,16 @@ const user = await app.verifyUserToken(bearer, process.env.YERIA_SERVICE_ID);</c
 
 <h2 id="tester">7. Test</h2>
 
-<p><strong>Your service is not in the catalogue yet.</strong> As long as it has not been through the Yeria review — and whenever it is unpublished — it appears nowhere in search or in the public listings. You will find it in the app under <em>My private services</em>, and only there.</p>
+<p>Your service is not in the catalogue yet. Until it has been through the Yeria review, and any time it is unpublished, it appears nowhere in search or in the public listings. You will find it in the app under <em>My private services</em>, and nowhere else.</p>
 
-<p><strong>You have to invite yourself.</strong> That section lists the services you have been granted access to, so open your service in the provider area, go to the <em>Access</em> tab, and invite the account you use in the app. The invitation shows up in the app and you accept it; the service then appears in your private list, with the view your backend serves.</p>
+<p>That section only lists services you have been granted access to, so you have to invite yourself. Open your service in the provider area, go to the <em>Access</em> tab, and invite the account you use in the app. Accept the invitation when it arrives, and the service shows up in your private list with the view your backend serves.</p>
 
-<p>Open your service from the Yeria app. The screen described in step 4 appears natively. Change the view, redeploy your backend, reopen the service: the screen has changed, with no store release.</p>
+<p>Open your service from the Yeria app. The screen from step 5 appears natively. Change the view, redeploy, then reopen the service: the screen changes without shipping a new app version.</p>
 
 <h2 id="ensuite">Next</h2>
 
 <ul>
-    <li><a href="/docs/integration">Provider integration</a> — key rotation, user profiles, error handling.</li>
-    <li><a href="/docs/formview">FormView</a> — every field type and its validations.</li>
-    <li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a> — the exact split of responsibilities.</li>
+    <li><a href="/docs/integration">Provider integration</a>: key rotation, user profiles, error handling.</li>
+    <li><a href="/docs/formview">FormView</a>: every field type and its validations.</li>
+    <li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a>: the exact split of responsibilities.</li>
 </ul>

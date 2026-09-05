@@ -54,6 +54,18 @@ const noteAccentEnv = app.signer.signNotification(
   FIXED_TS
 );
 
+// La MEME notification, signee depuis un deploiement de developpement. Le
+// selecteur entre dans la charge signee, en derniere position : l'ordre des
+// cles fait partie des octets signes. Sans ce vecteur, une divergence d'ordre
+// entre JS et Python ne se verrait qu'a la premiere notification refusee par
+// le backend, en production.
+const noteDevEnv = app.signer.signNotification(
+  new Notification('u1', 'Title', 'Body'),
+  'parity',
+  FIXED_TS,
+  'devkey_a3f9c81e04b2d675'
+);
+
 // Structural goldens: one representative view per builder. The Python test
 // rebuilds each with the equivalent fluent calls and asserts the JSON is
 // structurally identical (transparent to the mobile renderer). Keep the calls
@@ -263,6 +275,8 @@ const vector = {
   viewSignature: viewEnv.signature,
   noteSignature: noteEnv.signature,
   noteAccentSignature: noteAccentEnv.signature,
+  noteDevSignature: noteDevEnv.signature,
+  devKeyId: 'devkey_a3f9c81e04b2d675',
   floatViewJson: floatForm.toJSON(),
   floatPayload: floatEnv.payload,
   floatSignature: floatEnv.signature,

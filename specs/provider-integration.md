@@ -1,43 +1,23 @@
 # Provider integration
 
-How a provider plugs its backend into Yeria, end to end: keys, authentication,
-user profiles. Two language sketches; same protocol.
+How a provider plugs its backend into Yeria, end to end: keys, authentication, user profiles. The examples come in two languages and follow the same protocol.
 
-The SDK ships **helpers, not middleware**. Wire them into your own auth layer
-(Express middleware, FastAPI dependency, Total.js handler, …). There is no
-`YeriaApp.authMiddleware()` and there never will be — framework integration is
-your call.
-
----
+The SDK gives you helpers rather than middleware. You wire them into your own auth layer, whether that is an Express middleware, a FastAPI dependency or a Total.js handler. There is no `YeriaApp.authMiddleware()`, because how the SDK meets your framework is your decision, not ours.
 
 ## Where your backend sits
 
-Yeria is a **registry and an identity provider**, not a proxy. Once the mobile
-app has resolved your service, it talks to **your URL directly**. Yeria never
-sees that traffic.
+Yeria is a registry and an identity provider, not a proxy. Once the mobile app has resolved your service it talks to your URL directly, and Yeria never sees that traffic.
 
-```
-[Mobile] ── discovers service ──> [Yeria]        (catalog, review, signing keys)
-[Mobile] ── mints service JWT ──> [Yeria]        (POST /user/service-token)
-[Mobile] ── Bearer <serviceJWT> ─> [Your backend]  ← all real traffic
-```
-
-So your backend must be reachable over HTTPS from user devices, and it must
-verify every inbound token itself. That is what this page covers.
-
----
+So your backend has to be reachable over HTTPS from user devices, and it has to verify every inbound token itself. Both are covered below.
 
 ## The two key systems
 
 | Key | Algorithm | Who owns it | What it does |
-|---|---|---|---|
+|-------|-------|-------|-------|
 | Yeria platform key | RSA (**RS256**) | Yeria | Signs the user tokens you receive. You only **verify** with it; the SDK fetches and caches it by `kid`. |
 | Your service key | **Ed25519** | You | Signs the view envelopes you return and your provider→Yeria calls. Public half registered on your Yeria service; private half never leaves your backend. |
 
-Generating an RSA keypair for your service is **wrong** — the registry rejects
-anything that is not Ed25519.
-
----
+Do not generate an RSA keypair for your service. The registry rejects anything that is not Ed25519.
 
 ## 1. Generate your service keypair
 
@@ -59,61 +39,51 @@ const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' });
 const publicPem  = publicKey.export({ type: 'spki', format: 'pem' });
 ```
 
-The public key looks like this — one short base64 line, because Ed25519 keys
-are 32 bytes:
+The public key is one short base64 line, since Ed25519 keys are 32 bytes:
 
-```
------BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA14UIHuc98YQOnlD+EB8BIT2zbEzPJipRvXtcQifZ+jE=
------END PUBLIC KEY-----
-```
-
-> **The private key is your service's identity.** Never commit it, never send
-> it to Yeria, never put it in a mobile build. Anyone holding it can sign views
-> and provider calls as you. If it leaks, rotate immediately.
+**The private key is your service's identity.** Never commit it, never send it to Yeria, never put it in a mobile build. Anyone holding it can sign views and provider calls as you. If it leaks, rotate immediately.
 
 ## 2. Register the public key
 
-Paste the **public** PEM into your service's *Provider public key* field in the
-Yeria provider dashboard (Services → your service → Edit). Yeria stores it in
-its key registry and uses it to verify everything you sign.
+Paste the **public** PEM into your service's *Provider public key* field in the Yeria provider dashboard (Services → your service → Edit). Yeria stores it in its key registry and uses it to verify everything you sign.
 
-On a service that has already been approved by a Yeria review, changing the key
-is a registry edit: it is staged into a draft and applied when the review is
-approved. Emergency rotation is separate — see *Key rotation* below.
+On a service that a Yeria review has already approved, changing the key is a registry edit: it goes into a draft and applies once the review is approved. Emergency rotation follows a different path, described under *Key rotation* below.
 
 ## 3. Configure your backend
 
 | Env var | Purpose |
-|---|---|
+|-------|-------|
 | `YERIA_BASE_URL` | e.g. `https://yeria.app`. Trailing slash optional. |
 | `YERIA_APP_ID` | Your application identifier; carried inside every signed payload. |
 | `YERIA_SERVICE_ID` | Your service's id in Yeria. Used to pin the token audience. |
 | `SERVICE_ED25519_PRIVATE_KEY` | PEM of the private key from step 1. |
 
----
+## 4. Point Yeria at your laptop (optional)
+
+You can have Yeria send your own account to your working deployment while everyone else keeps using production. Yeria swaps the service URL and its verification key together, so your phone checks what your laptop signed.
+
+You need explicit access to the service first: Services → your service → Access. Belonging to the provider does not give it to you, and neither does having registered the service. Without it the Development screen answers 403. Invite the account you develop from, which is often not the one you registered with, and accept the invitation.
+
+Then go to Services → your service → Development and give it two things: the URL your deployment answers on, and the public PEM of a keypair you generate for this. **Do not reuse your production key.** Yeria replies with a selector like `devkey_a3f9c81e04b2d675`. Put it in your config next to the matching private key:
+
+```ts
+const yeriaApp = new YeriaApp({
+  appId: 'my-backend-service',
+  privateKey: devPrivateKey,        // the development key, not production's
+  baseUrl: 'https://yeria.app',
+  devKeyId: 'devkey_a3f9c81e04b2d675'
+});
+```
+
+In Python the field is `dev_key_id`. Its presence tells Yeria the call comes from your deployment, and its value picks the row that checks your signature. Setting it without the matching private key gets you nowhere, since it only chooses which keys Yeria compares against.
+
+You get this on `notify` and `fetchUserDetails`. Key rotation answers 403, because renewing a service's production key should come from production rather than from a laptop whose key expires by itself. Notifications signed this way only reach your own account, so you cannot wake real users from a development build.
+
+The setting clears itself after 30 days, or 90 if you ask for the maximum. While it is live the mobile app shows a banner on the service with a button to remove it, and that button keeps working after your access is revoked, so you are never stuck on a development screen. **Leave `devKeyId` unset in production.**
 
 ## Request lifecycle
 
-```
-[Mobile] -- Bearer <serviceJWT> --> [Provider backend]
-                                          |
-                                          | 1. app.verifyUserToken(bearer, SERVICE_ID)
-                                          |    (signature math; key cached after first hit)
-                                          |
-                                          | 2. cache miss? app.fetchUserDetails(...)
-                                          |    (signs an envelope, POSTs to Yeria)
-                                          |
-                                          | 3. your handler logic
-                                          v
-                                  [YeriaUI builds a view → app.serve(view)]
-```
-
-Step 1 is the hot path: no network once the signing key is cached. Step 2 fires
-on the first hit per user, then never again — persist the profile by `sub` and
-serve it locally afterwards.
-
----
+Step 1 is the hot path and makes no network call once the signing key is cached. Step 2 fires on the first hit per user and never again, so store the profile under its `sub` and serve it locally from then on.
 
 ## JavaScript / TypeScript
 
@@ -228,13 +198,9 @@ async def home(auth = Depends(require_yeria_user)):
     return app.serve(view)
 ```
 
----
-
 ## Persistence model
 
-Mirror Yeria's `sub` into your own `users` table. It is stable for the lifetime
-of the user's Yeria account and is the only field guaranteed to be present in
-every per-service token.
+Mirror Yeria's `sub` into your own `users` table. It is stable for the lifetime of the user's Yeria account and is the only field guaranteed to be present in every per-service token.
 
 ```sql
 CREATE TABLE users (
@@ -251,53 +217,32 @@ CREATE TABLE users (
 CREATE INDEX users_yeria_sub_idx ON users (yeria_sub);
 ```
 
-Refresh policy is yours: a TTL on `fetched_at`, or an explicit "refresh from
-Yeria" action in your own settings screen.
-
----
+Refresh policy is yours: a TTL on `fetched_at`, or an explicit "refresh from Yeria" action in your own settings screen.
 
 ## Key rotation
 
-**Yeria's key** rotates on its own schedule. The retired key stays valid for a
-short grace window, then stops resolving. The SDK's internal key store follows
-the `kid` in each token header and fetches the new PEM on first encounter — you
-do not restart anything, and you do not manage PEMs.
+Yeria's key rotates on its own schedule. The retired key stays valid for a short grace window, then stops resolving. The SDK's key store follows the `kid` in each token header and fetches the new PEM the first time it sees it, so you never restart anything or handle a PEM yourself.
 
-**Your key** rotates when you call `app.rotateKey(...)`, or through the service
-edit form. The previous key keeps verifying for a 5-minute grace window so
-in-flight requests survive the swap.
-
----
+Your own key rotates when you call `app.rotateKey(...)`, or through the service edit form. The previous key keeps verifying for five minutes so requests already in flight survive the swap.
 
 ## What is NOT in the body
 
-Provider-signed calls (`fetchUserDetails`, key rotation) **never** carry a
-bearer token in the body. The credential is the Ed25519 signature over the
-envelope, made with your registered private key. Yeria already holds every
-active public key for your service, so the body does not nominate which key
-signed — Yeria tries the registered keys and accepts any match. This keeps the
-wire shape minimal and avoids leaking bearer tokens into logs of signed
-payloads.
-
----
+Provider-signed calls (`fetchUserDetails`, key rotation) never carry a bearer token in the body. The credential is the Ed25519 signature over the envelope, made with your registered private key. Yeria already holds every active public key for your service, so the body does not say which key signed: Yeria tries the registered keys and accepts any match. That keeps the payload small and stops bearer tokens from ending up in logs of signed bodies.
 
 ## Errors quick reference
 
 | SDK error | Likely cause | Right HTTP response |
-|---|---|---|
+|-------|-------|-------|
 | `SignatureVerificationError` | Wrong key, tampered token, or a key Yeria no longer trusts | `401` |
 | `ViewExpiredError` | `exp` is in the past | `401` |
-| `YeriaPlatformUnreachableError` | Yeria is down or unreachable — the token itself may be valid | `503` |
+| `YeriaPlatformUnreachableError` | Yeria is down or unreachable, so the token itself may still be valid | `503` |
 | Profile fetch failed | Misconfigured service id, replayed envelope, or a key Yeria rejected | `502` / `503` |
 | Unexpected response shape | Yeria upgraded the wire format and your SDK is older | Upgrade the SDK |
 
-Return errors to the mobile through `app.serveError({ code, message, status })`
-so they arrive **signed** — see [YeriaUI & YeriaApp](yeria-app.md).
-
----
+Return errors to the mobile through `app.serveError({ code, message, status })` so they arrive signed. See [YeriaUI & YeriaApp](yeria-app.md).
 
 ## See also
 
-- [YeriaUI & YeriaApp](yeria-app.md) — the full API surface
-- [Component specifications](readme.md) — every view type
-- [Notifications](notification.md) — subscription rules and delivery errors
+- [YeriaUI & YeriaApp](yeria-app.md): the full API surface
+- [Component specifications](readme.md): every view type
+- [Notifications](notification.md): subscription rules and delivery errors

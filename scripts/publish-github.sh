@@ -6,7 +6,9 @@
 #   ./scripts/publish-github.sh --push     # pousse pour de bon
 #
 # Le miroir (github.com/yeria-app/yeriasdk) ne rejoue pas l'historique interne :
-# il porte UN commit par version publique, chaîné sur le précédent. On y retrouve
+# il porte UN commit par version publique, chaîné sur le précédent, et UN tag
+# `vX.Y.Z` posé dessus — c'est le tag qui rend une version repérable sur le
+# miroir, où l'historique ne dit rien. On y retrouve
 # donc « Public release v1.2.0 », « v1.3.0 »… et rien du travail intermédiaire.
 # Ce choix est délibéré — l'historique interne cite des tickets, des brouillons
 # et des évaluations qui n'ont pas à sortir.
@@ -107,21 +109,42 @@ git clone --quiet --depth 1 --branch main "$(git remote get-url github)" "$MIRRO
 rsync -a --delete --exclude '.git' "$WORK/" "$MIRROR/"
 
 cd "$MIRROR"
-if [ -z "$(git status --porcelain)" ]; then
-  log "le miroir est déjà identique — rien à publier"
+
+# Le tag fait partie de la publication, au même titre que le contenu : toutes
+# les versions précédentes en portent un, et sans lui le miroir a bien le code
+# mais ne dit pas à quelle version il correspond. Il se vérifie donc à part —
+# un miroir déjà identique mais non tagué reste à taguer, ce qui est
+# exactement ce qui manquait à 1.4.0.
+#
+# `tail -1` : un tag annoté sort deux lignes de ls-remote, l'objet puis le
+# commit déréférencé ; un tag simple n'en sort qu'une. La dernière est le
+# commit dans les deux cas.
+REMOTE_TAG="$(git ls-remote --tags origin "refs/tags/v$VERSION" | awk '{print $1}' | tail -1)"
+
+CONTENT_CHANGED=true
+[ -z "$(git status --porcelain)" ] && CONTENT_CHANGED=false
+
+if ! $CONTENT_CHANGED && [ -n "$REMOTE_TAG" ]; then
+  log "le miroir est déjà identique et porte v$VERSION — rien à publier"
   exit 0
 fi
 
-echo
-git -c color.ui=always status --short | head -40
-echo
-log "$(git status --porcelain | wc -l | tr -d ' ') fichier(s) modifié(s) sur le miroir"
+if $CONTENT_CHANGED; then
+  echo
+  git -c color.ui=always status --short | head -40
+  echo
+  log "$(git status --porcelain | wc -l | tr -d ' ') fichier(s) modifié(s) sur le miroir"
+else
+  log "miroir identique — seul le tag v$VERSION manque"
+fi
 
 if ! $PUSH; then
   log "essai à blanc — relancer avec --push pour publier"
+  [ -z "$REMOTE_TAG" ] && log "poserait le tag v$VERSION"
   exit 0
 fi
 
+if $CONTENT_CHANGED; then
 git add -A
 git commit -q -m "Public release v$VERSION: yeriasdk" -m "$(
   cd "$HERE"
@@ -135,3 +158,18 @@ git commit -q -m "Public release v$VERSION: yeriasdk" -m "$(
 
 git push --quiet origin main
 log "publié : $(git rev-parse --short HEAD) sur github/main"
+fi
+
+# Un tag de publication est un point fixe : on le pose s'il manque, jamais on
+# ne le déplace. S'il existe et pointe ailleurs, c'est une anomalie qui mérite
+# un arrêt plutôt qu'une réécriture silencieuse.
+HEAD_SHA="$(git rev-parse HEAD)"
+if [ -z "$REMOTE_TAG" ]; then
+  git tag "v$VERSION" "$HEAD_SHA"
+  git push --quiet origin "refs/tags/v$VERSION"
+  log "tag v$VERSION posé sur $(git rev-parse --short HEAD)"
+elif [ "$REMOTE_TAG" = "$HEAD_SHA" ]; then
+  log "tag v$VERSION déjà en place"
+else
+  die "v$VERSION existe sur le miroir et pointe sur ${REMOTE_TAG:0:7}, pas sur ${HEAD_SHA:0:7} — un point de publication ne se réécrit pas"
+fi

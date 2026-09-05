@@ -65,6 +65,62 @@ def test_notification_signature_matches_js(app, vector):
     assert signed.signature == vector["noteSignature"]
 
 
+def test_dev_notification_signature_matches_js(app, vector):
+    """Une notification emise depuis un point de developpement.
+
+    Le selecteur `devKeyId` entre dans la charge SIGNEE, en derniere position.
+    L'ordre des cles fait partie des octets signes : si Python l'inserait
+    ailleurs, la signature differerait de celle de JS et le backend refuserait
+    la notification — ce que rien d'autre ne rattraperait avant la production.
+    """
+    note = Notification("u1", "Title", "Body")
+    signed = app._signer.sign_notification(
+        note, vector["appId"], vector["timestamp"], vector["devKeyId"]
+    )
+    assert signed.signature == vector["noteDevSignature"]
+    assert signed.dev_key_id == vector["devKeyId"]
+
+
+def test_rotate_key_refused_in_dev_mode():
+    """La rotation ne part pas d'un poste de developpement.
+
+    Le serveur refuse une enveloppe portant `devKeyId`, mais l'enveloppe de
+    rotation n'en met pas : la garde serveur ne se declencherait jamais depuis
+    ce client. Un deploiement configure en developpement qui detiendrait par
+    ailleurs la cle de production pourrait donc faire tourner la cle du service.
+    Le refus est donc LOCAL.
+    """
+    import pytest
+    from yeriasdk import YeriaApp, YeriaAppConfig
+    from yeriasdk.errors import ConfigurationError
+
+    app = YeriaApp(YeriaAppConfig(
+        app_id="s", base_url="http://x", dev_key_id="devkey_abc"
+    ))
+    # Le refus doit tomber AVANT tout reseau et avant tout usage des cles :
+    # deux chaines non vides suffisent donc a le declencher.
+    with pytest.raises(ConfigurationError, match="production"):
+        app.rotate_key("http://x", "s", {
+            "privateKey": "-----BEGIN PRIVATE KEY-----x-----END PRIVATE KEY-----",
+            "publicKey": "-----BEGIN PUBLIC KEY-----x-----END PUBLIC KEY-----",
+        })
+
+
+def test_empty_dev_key_id_signs_like_production(app, vector):
+    """Une chaine vide n'est pas un selecteur.
+
+    JS n'ajoute la cle que si elle est non vide, et le backend reconstruit la
+    charge avec la meme condition. Si Python signait `devKeyId: ""`, il signerait
+    quatre cles la ou le serveur en verifie trois : toutes ses notifications
+    echoueraient, et seulement les siennes. Le cas arrive des qu'une variable
+    d'environnement est definie mais vide.
+    """
+    note = Notification("u1", "Title", "Body")
+    signed = app._signer.sign_notification(note, vector["appId"], vector["timestamp"], "")
+    assert signed.signature == vector["noteSignature"]
+    assert signed.dev_key_id is None
+
+
 def test_accented_notification_signature_matches_js(app, vector):
     """Le backend reconstruit la charge utile d'une notification avec
     `JSON.stringify` avant d'en verifier la signature : un titre en francais

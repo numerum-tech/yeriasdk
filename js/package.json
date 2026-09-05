@@ -1,6 +1,6 @@
 {
   "name": "@numerum-tech/yeriasdk",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "An SDK for generating dynamic interfaces for the Yeria application ecosystem",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

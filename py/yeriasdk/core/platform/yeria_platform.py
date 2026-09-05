@@ -52,12 +52,15 @@ class YeriaPlatform:
         base_url: Optional[str] = None,
         notification_timeout: int = 5,
         key_store: Optional[YeriaPublicKeys] = None,
+        dev_key_id: Optional[str] = None,
     ):
         self._app_id = app_id
         self._signer = signer
         self._base_url = base_url
         self._notification_timeout = notification_timeout
         self._key_store = key_store
+        # Selecteur d'un point de developpement. Voir YeriaAppConfig.devKeyId.
+        self._dev_key_id = dev_key_id
 
     def set_base_url(self, base_url: Optional[str]) -> None:
         self._base_url = base_url
@@ -65,10 +68,19 @@ class YeriaPlatform:
     # ── Notifications ───────────────────────────────────────────────────
     def sign_notification(self, notification: Any) -> SecureNotificationResponse:
         """Sign a notification without sending it (returns the signed payload)."""
-        return self._signer.sign_notification(notification, self._app_id)
+        return self._signer.sign_notification(
+            notification, self._app_id, None, self._dev_key_id
+        )
 
     def send_notification(self, notification: Any) -> None:
-        """Sign and POST a notification to ``POST /api/v1/user/notifications``."""
+        """Sign and POST a notification to
+        ``POST /api/v1/provider/services/{id}/notifications``.
+
+        Route SIGNEE de serveur a serveur, donc sous le prefixe ``provider`` :
+        elle ne porte aucun jeton. Elle visait ``/api/v1/user/notifications``,
+        ou le middleware exige un JWT que ce client n'envoie pas — elle
+        repondait donc 401.
+        """
         import requests
 
         signed = self.sign_notification(notification)
@@ -76,20 +88,32 @@ class YeriaPlatform:
             raise ConfigurationError(
                 "Yeria base_url required for sending notifications. Set base_url in YeriaAppConfig."
             )
-        url = self._base_url.rstrip("/") + "/api/v1/user/notifications"
+        url = (
+            self._base_url.rstrip("/")
+            + f"/api/v1/provider/services/{signed.app_id}/notifications"
+        )
+        # `link` est OMIS quand il est absent, exactement comme dans la charge
+        # signee : le backend reconstruit ce qu'il signe a partir de l'objet
+        # `notification` tel qu'il le recoit. Emettre "link": null ici alors que
+        # la signature couvre un objet sans `link` faisait echouer la
+        # verification de toute notification sans lien.
+        message = {
+            "title": signed.notification.message.title,
+            "body": signed.notification.message.body,
+        }
+        if signed.notification.message.link is not None:
+            message["link"] = signed.notification.message.link
         payload = {
             "appId": signed.app_id,
             "signature": signed.signature,
             "timestamp": signed.timestamp,
             "notification": {
                 "userId": signed.notification.user_id,
-                "message": {
-                    "title": signed.notification.message.title,
-                    "body": signed.notification.message.body,
-                    "link": signed.notification.message.link,
-                },
+                "message": message,
             },
         }
+        if signed.dev_key_id:
+            payload["devKeyId"] = signed.dev_key_id
         try:
             res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=self._notification_timeout)
             res.raise_for_status()
@@ -106,10 +130,22 @@ class YeriaPlatform:
         if not priv or not pub:
             raise ConfigurationError("rotate_key requires both privateKey and publicKey in PEM format")
 
+        # Refus LOCAL en mode developpement. Le serveur refuse deja une enveloppe
+        # portant `devKeyId`, mais la rotation n'en met pas : la garde serveur ne
+        # se declencherait donc jamais depuis ce client, et un deploiement
+        # configure en developpement detenant par ailleurs la cle de production
+        # pourrait faire tourner la cle du service.
+        if self._dev_key_id:
+            raise ConfigurationError(
+                "rotate_key is refused while dev_key_id is set: rotating the service key must come from production"
+            )
+
         envelope = {"serviceId": str(service_id), "newPublicKey": pub, "timestamp": int(time.time() * 1000)}
         # Same serializer as every signed byte: compact, byte-matches JS.
         signature = self._signer.sign_payload(dumps_for_signing(envelope))
-        url = f"{yeria_api_base_url.rstrip('/')}/api/v1/services/{service_id}/keys/rotate"
+        # `/api/v1/provider/...` : ecrite avant la taxonomie a six prefixes,
+        # l'URL sans `provider` ne correspond a aucune route et repondait 404.
+        url = f"{yeria_api_base_url.rstrip('/')}/api/v1/provider/services/{service_id}/keys/rotate"
         try:
             res = requests.post(
                 url,
@@ -201,6 +237,11 @@ class YeriaPlatform:
             "timestamp": int(time.time() * 1000),
             "nonce": base64.b16encode(os.urandom(16)).decode().lower(),
         }
+        # Ajoute SEULEMENT s'il existe, et en DERNIERE position : l'ordre des
+        # cles fait partie des octets signes, et JS insere la sienne au meme
+        # endroit. Une enveloppe de production ne change pas de forme.
+        if self._dev_key_id:
+            envelope["devKeyId"] = self._dev_key_id
         payload_str = dumps_for_signing(envelope)
         signature = self._signer.sign_payload(payload_str)
 

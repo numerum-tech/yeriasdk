@@ -1,18 +1,18 @@
-<p>How a provider plugs its backend into Yeria, end to end: keys, authentication, user profiles. Two language sketches; same protocol.</p>
+<p>How a provider plugs its backend into Yeria, end to end: keys, authentication, user profiles. The examples come in two languages and follow the same protocol.</p>
 
-<p>The SDK ships <strong>helpers, not middleware</strong>. Wire them into your own auth layer (Express middleware, FastAPI dependency, Total.js handler, …). There is no <code class="ys-code">YeriaApp.authMiddleware()</code> and there never will be — framework integration is your call.</p>
+<p>The SDK gives you helpers rather than middleware. You wire them into your own auth layer, whether that is an Express middleware, a FastAPI dependency or a Total.js handler. There is no <code class="ys-code">YeriaApp.authMiddleware()</code>, because how the SDK meets your framework is your decision, not ours.</p>
 
 <hr>
 
 <h2 id="where-your-backend-sits">Where your backend sits</h2>
 
-<p>Yeria is a <strong>registry and an identity provider</strong>, not a proxy. Once the mobile app has resolved your service, it talks to <strong>your URL directly</strong>. Yeria never sees that traffic.</p>
+<p>Yeria is a registry and an identity provider, not a proxy. Once the mobile app has resolved your service it talks to your URL directly, and Yeria never sees that traffic.</p>
 
 <pre class="ys-codeblock"><code>[Mobile] ── discovers service ──&gt; [Yeria]        (catalog, review, signing keys)
 [Mobile] ── mints service JWT ──&gt; [Yeria]        (POST /user/service-token)
 [Mobile] ── Bearer &lt;serviceJWT&gt; ─&gt; [Your backend]  ← all real traffic</code></pre>
 
-<p>So your backend must be reachable over HTTPS from user devices, and it must verify every inbound token itself. That is what this page covers.</p>
+<p>So your backend has to be reachable over HTTPS from user devices, and it has to verify every inbound token itself. Both are covered below.</p>
 
 <hr>
 
@@ -20,7 +20,7 @@
 
 <div class="ys-table-wrap"><table><thead><tr><th>Key</th><th>Algorithm</th><th>Who owns it</th><th>What it does</th></tr></thead><tbody><tr><td>Yeria platform key</td><td>RSA (<strong>RS256</strong>)</td><td>Yeria</td><td>Signs the user tokens you receive. You only <strong>verify</strong> with it; the SDK fetches and caches it by <code class="ys-code">kid</code>.</td></tr><tr><td>Your service key</td><td><strong>Ed25519</strong></td><td>You</td><td>Signs the view envelopes you return and your provider→Yeria calls. Public half registered on your Yeria service; private half never leaves your backend.</td></tr></tbody></table></div>
 
-<p>Generating an RSA keypair for your service is <strong>wrong</strong> — the registry rejects anything that is not Ed25519.</p>
+<p>Do not generate an RSA keypair for your service. The registry rejects anything that is not Ed25519.</p>
 
 <hr>
 
@@ -40,7 +40,7 @@ const { privateKey, publicKey } = generateKeyPairSync('ed25519');
 const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' });
 const publicPem  = publicKey.export({ type: 'spki', format: 'pem' });</code></pre>
 
-<p>The public key looks like this — one short base64 line, because Ed25519 keys are 32 bytes:</p>
+<p>The public key is one short base64 line, since Ed25519 keys are 32 bytes:</p>
 
 <pre class="ys-codeblock"><code>-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEA14UIHuc98YQOnlD+EB8BIT2zbEzPJipRvXtcQifZ+jE=
@@ -52,11 +52,34 @@ MCowBQYDK2VwAyEA14UIHuc98YQOnlD+EB8BIT2zbEzPJipRvXtcQifZ+jE=
 
 <p>Paste the <strong>public</strong> PEM into your service's <em>Provider public key</em> field in the Yeria provider dashboard (Services → your service → Edit). Yeria stores it in its key registry and uses it to verify everything you sign.</p>
 
-<p>On a service that has already been approved by a Yeria review, changing the key is a registry edit: it is staged into a draft and applied when the review is approved. Emergency rotation is separate — see <em>Key rotation</em> below.</p>
+<p>On a service that a Yeria review has already approved, changing the key is a registry edit: it goes into a draft and applies once the review is approved. Emergency rotation follows a different path, described under <em>Key rotation</em> below.</p>
 
 <h2 id="3-configure-your-backend">3. Configure your backend</h2>
 
 <div class="ys-table-wrap"><table><thead><tr><th>Env var</th><th>Purpose</th></tr></thead><tbody><tr><td><code class="ys-code">YERIA_BASE_URL</code></td><td>e.g. <code class="ys-code">https://yeria.app</code>. Trailing slash optional.</td></tr><tr><td><code class="ys-code">YERIA_APP_ID</code></td><td>Your application identifier; carried inside every signed payload.</td></tr><tr><td><code class="ys-code">YERIA_SERVICE_ID</code></td><td>Your service's id in Yeria. Used to pin the token audience.</td></tr><tr><td><code class="ys-code">SERVICE_ED25519_PRIVATE_KEY</code></td><td>PEM of the private key from step 1.</td></tr></tbody></table></div>
+
+<hr>
+
+<h2 id="4-point-yeria-at-your-laptop">4. Point Yeria at your laptop (optional)</h2>
+
+<p>You can have Yeria send your own account to your working deployment while everyone else keeps using production. Yeria swaps the service URL and its verification key together, so your phone checks what your laptop signed.</p>
+
+<p>You need explicit access to the service first: Services &rarr; your service &rarr; Access. Belonging to the provider does not give it to you, and neither does having registered the service. Without it the Development screen answers 403. Invite the account you develop from, which is often not the one you registered with, and accept the invitation.</p>
+
+<p>Then go to Services &rarr; your service &rarr; Development and give it two things: the URL your deployment answers on, and the public PEM of a keypair you generate for this. <strong>Do not reuse your production key.</strong> Yeria replies with a selector like <code class="ys-code">devkey_a3f9c81e04b2d675</code>. Put it in your config next to the matching private key:</p>
+
+<pre class="ys-codeblock" data-lang="ts"><code>const yeriaApp = new YeriaApp({
+  appId: 'my-backend-service',
+  privateKey: devPrivateKey,        // the development key, not production's
+  baseUrl: 'https://yeria.app',
+  devKeyId: 'devkey_a3f9c81e04b2d675'
+});</code></pre>
+
+<p>In Python the field is <code class="ys-code">dev_key_id</code>. Its presence tells Yeria the call comes from your deployment, and its value picks the row that checks your signature. Setting it without the matching private key gets you nowhere, since it only chooses which keys Yeria compares against.</p>
+
+<p>You get this on <code class="ys-code">notify</code> and <code class="ys-code">fetchUserDetails</code>. Key rotation answers 403, because renewing a service's production key should come from production rather than from a laptop whose key expires by itself. Notifications signed this way only reach your own account, so you cannot wake real users from a development build.</p>
+
+<p>The setting clears itself after 30 days, or 90 if you ask for the maximum. While it is live the mobile app shows a banner on the service with a button to remove it, and that button keeps working after your access is revoked, so you are never stuck on a development screen. <strong>Leave <code class="ys-code">devKeyId</code> unset in production.</strong></p>
 
 <hr>
 
@@ -74,7 +97,7 @@ MCowBQYDK2VwAyEA14UIHuc98YQOnlD+EB8BIT2zbEzPJipRvXtcQifZ+jE=
                                           v
                                   [YeriaUI builds a view → app.serve(view)]</code></pre>
 
-<p>Step 1 is the hot path: no network once the signing key is cached. Step 2 fires on the first hit per user, then never again — persist the profile by <code class="ys-code">sub</code> and serve it locally afterwards.</p>
+<p>Step 1 is the hot path and makes no network call once the signing key is cached. Step 2 fires on the first hit per user and never again, so store the profile under its <code class="ys-code">sub</code> and serve it locally from then on.</p>
 
 <hr>
 
@@ -212,26 +235,26 @@ CREATE INDEX users_yeria_sub_idx ON users (yeria_sub);</code></pre>
 
 <h2 id="key-rotation">Key rotation</h2>
 
-<p><strong>Yeria's key</strong> rotates on its own schedule. The retired key stays valid for a short grace window, then stops resolving. The SDK's internal key store follows the <code class="ys-code">kid</code> in each token header and fetches the new PEM on first encounter — you do not restart anything, and you do not manage PEMs.</p>
+<p>Yeria's key rotates on its own schedule. The retired key stays valid for a short grace window, then stops resolving. The SDK's key store follows the <code class="ys-code">kid</code> in each token header and fetches the new PEM the first time it sees it, so you never restart anything or handle a PEM yourself.</p>
 
-<p><strong>Your key</strong> rotates when you call <code class="ys-code">app.rotateKey(...)</code>, or through the service edit form. The previous key keeps verifying for a 5-minute grace window so in-flight requests survive the swap.</p>
+<p>Your own key rotates when you call <code class="ys-code">app.rotateKey(...)</code>, or through the service edit form. The previous key keeps verifying for five minutes so requests already in flight survive the swap.</p>
 
 <hr>
 
 <h2 id="what-is-not-in-the-body">What is NOT in the body</h2>
 
-<p>Provider-signed calls (<code class="ys-code">fetchUserDetails</code>, key rotation) <strong>never</strong> carry a bearer token in the body. The credential is the Ed25519 signature over the envelope, made with your registered private key. Yeria already holds every active public key for your service, so the body does not nominate which key signed — Yeria tries the registered keys and accepts any match. This keeps the wire shape minimal and avoids leaking bearer tokens into logs of signed payloads.</p>
+<p>Provider-signed calls (<code class="ys-code">fetchUserDetails</code>, key rotation) never carry a bearer token in the body. The credential is the Ed25519 signature over the envelope, made with your registered private key. Yeria already holds every active public key for your service, so the body does not say which key signed: Yeria tries the registered keys and accepts any match. That keeps the payload small and stops bearer tokens from ending up in logs of signed bodies.</p>
 
 <hr>
 
 <h2 id="errors-quick-reference">Errors quick reference</h2>
 
-<div class="ys-table-wrap"><table><thead><tr><th>SDK error</th><th>Likely cause</th><th>Right HTTP response</th></tr></thead><tbody><tr><td><code class="ys-code">SignatureVerificationError</code></td><td>Wrong key, tampered token, or a key Yeria no longer trusts</td><td><code class="ys-code">401</code></td></tr><tr><td><code class="ys-code">ViewExpiredError</code></td><td><code class="ys-code">exp</code> is in the past</td><td><code class="ys-code">401</code></td></tr><tr><td><code class="ys-code">YeriaPlatformUnreachableError</code></td><td>Yeria is down or unreachable — the token itself may be valid</td><td><code class="ys-code">503</code></td></tr><tr><td>Profile fetch failed</td><td>Misconfigured service id, replayed envelope, or a key Yeria rejected</td><td><code class="ys-code">502</code> / <code class="ys-code">503</code></td></tr><tr><td>Unexpected response shape</td><td>Yeria upgraded the wire format and your SDK is older</td><td>Upgrade the SDK</td></tr></tbody></table></div>
+<div class="ys-table-wrap"><table><thead><tr><th>SDK error</th><th>Likely cause</th><th>Right HTTP response</th></tr></thead><tbody><tr><td><code class="ys-code">SignatureVerificationError</code></td><td>Wrong key, tampered token, or a key Yeria no longer trusts</td><td><code class="ys-code">401</code></td></tr><tr><td><code class="ys-code">ViewExpiredError</code></td><td><code class="ys-code">exp</code> is in the past</td><td><code class="ys-code">401</code></td></tr><tr><td><code class="ys-code">YeriaPlatformUnreachableError</code></td><td>Yeria is down or unreachable, so the token itself may still be valid</td><td><code class="ys-code">503</code></td></tr><tr><td>Profile fetch failed</td><td>Misconfigured service id, replayed envelope, or a key Yeria rejected</td><td><code class="ys-code">502</code> / <code class="ys-code">503</code></td></tr><tr><td>Unexpected response shape</td><td>Yeria upgraded the wire format and your SDK is older</td><td>Upgrade the SDK</td></tr></tbody></table></div>
 
-<p>Return errors to the mobile through <code class="ys-code">app.serveError({ code, message, status })</code> so they arrive <strong>signed</strong> — see <a href="/docs/sdk">YeriaUI &amp; YeriaApp</a>.</p>
+<p>Return errors to the mobile through <code class="ys-code">app.serveError({ code, message, status })</code> so they arrive signed. See <a href="/docs/sdk">YeriaUI &amp; YeriaApp</a>.</p>
 
 <hr>
 
 <h2 id="see-also">See also</h2>
 
-<ul><li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a> — the full API surface</li><li><a href="/docs/introduction">Component specifications</a> — every view type</li><li><a href="/docs/notifications">Notifications</a> — subscription rules and delivery errors</li></ul>
+<ul><li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a>: the full API surface</li><li><a href="/docs/introduction">Component specifications</a>: every view type</li><li><a href="/docs/notifications">Notifications</a>: subscription rules and delivery errors</li></ul>

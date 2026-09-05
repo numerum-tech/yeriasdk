@@ -26,6 +26,9 @@ export interface YeriaPlatformConfig {
     signer: YeriaSigner;
     baseUrl?: string;
     notificationTimeout?: number;
+    /** Selecteur d'un point de developpement (`devkey_...`). Voir
+     *  YeriaAppConfig.devKeyId. */
+    devKeyId?: string;
     /** Optional pre-built key store for token verification. When omitted one
      *  is created lazily from `baseUrl`. */
     keyStore?: YeriaPublicKeys;
@@ -154,7 +157,9 @@ export class YeriaPlatform {
 
     /** Sign a notification without sending it (returns the signed payload). */
     signNotification(notification: Notification): SecureNotificationResponse {
-        return this.config.signer.signNotification(notification, this.config.appId);
+        return this.config.signer.signNotification(
+            notification, this.config.appId, undefined, this.config.devKeyId
+        );
     }
 
     /** Sign and POST a notification to `POST /api/v1/user/notifications`. */
@@ -164,7 +169,12 @@ export class YeriaPlatform {
         if (!this.config.baseUrl) {
             throw new ConfigurationError('Yeria baseUrl required for sending notifications. Set baseUrl in YeriaAppConfig.');
         }
-        const url = `${this.config.baseUrl.replace(/\/+$/, '')}/api/v1/user/notifications`;
+        // Route SIGNEE de serveur a serveur, donc sous le prefixe `provider` : ce
+        // n'est pas un appel d'utilisateur connecte et elle ne porte aucun
+        // jeton. Elle vivait sous `/api/v1/user/notifications`, ou le middleware
+        // exigeait un JWT que ce client n'envoie pas — elle repondait donc 401.
+        const url = `${this.config.baseUrl.replace(/\/+$/, '')}` +
+            `/api/v1/provider/services/${encodeURIComponent(String(this.config.appId))}/notifications`;
 
         try {
             const response = await fetch(url, {
@@ -204,6 +214,18 @@ export class YeriaPlatform {
             throw new ConfigurationError('rotateKey requires { privateKey, publicKey } in PEM');
         }
 
+        // Refus LOCAL en mode developpement. Le serveur refuse deja une
+        // enveloppe qui porte `devKeyId`, mais la rotation n'en met pas : la
+        // garde serveur ne se declencherait donc jamais depuis ce client, et un
+        // deploiement configure en developpement qui detiendrait par ailleurs la
+        // cle de production pourrait faire tourner la cle du service. Faire
+        // tourner la cle de production doit venir de la production.
+        if (this.config.devKeyId) {
+            throw new ConfigurationError(
+                'rotateKey is refused while devKeyId is set: rotating the service key must come from production'
+            );
+        }
+
         const envelope = {
             serviceId: String(serviceId),
             newPublicKey: newKeys.publicKey,
@@ -212,7 +234,10 @@ export class YeriaPlatform {
         const payload = stringifyForSigning(envelope);
         const signature = this.config.signer.signPayload(payload);
 
-        const url = `${yeriaApiBaseUrl.replace(/\/+$/, '')}/api/v1/services/${serviceId}/keys/rotate`;
+        // `/api/v1/provider/...` : ecrite avant la taxonomie a six prefixes,
+        // l'URL sans `provider` ne correspond a aucune route et repondait 404.
+        const url = `${yeriaApiBaseUrl.replace(/\/+$/, '')}` +
+            `/api/v1/provider/services/${encodeURIComponent(String(serviceId))}/keys/rotate`;
         let response: Response;
         try {
             response = await fetch(url, {
@@ -290,12 +315,15 @@ export class YeriaPlatform {
             );
         }
 
-        const envelope = {
+        const envelope: Record<string, unknown> = {
             service_id: serviceId,
             user_token: token,
             timestamp: Date.now(),
             nonce: randomBytes(16).toString('hex'),
         };
+        // Ajoute SEULEMENT s'il existe : une enveloppe de production ne doit
+        // pas changer de forme, sa signature couvrant la charge exacte.
+        if (this.config.devKeyId) envelope['devKeyId'] = this.config.devKeyId;
         const payloadStr = stringifyForSigning(envelope);
         const signature = this.config.signer.signPayload(payloadStr);
 

@@ -48,6 +48,43 @@ print(response.view)  # The view JSON
 print(response.signature)  # Ed25519 signature
 ```
 
+## Notifications
+
+```python
+from yeriasdk import YeriaApp, YeriaAppConfig, Notification
+
+app = YeriaApp(YeriaAppConfig(
+    app_id="my-backend-service",
+    private_key=private_key_pem,
+    base_url="https://yeria.app",
+))
+
+app.notify(Notification("user-123", "Bienvenue !", "Merci d'avoir rejoint Yeria"))
+```
+
+`POST {base_url}/api/v1/provider/services/{app_id}/notifications`. L'appel ne
+porte aucun jeton : la signature Ed25519 du service l'authentifie.
+
+### Depuis un déploiement de développement
+
+Le tableau de bord fournisseur rend un identifiant `devkey_...` après
+l'enregistrement de l'URL et de la clé publique de votre déploiement de travail.
+Reportez-le dans `dev_key_id` :
+
+```python
+app = YeriaApp(YeriaAppConfig(
+    app_id="my-backend-service",
+    private_key=dev_private_key_pem,   # la clé de développement
+    base_url="https://yeria.app",
+    dev_key_id="devkey_a3f9c81e04b2d675",
+))
+```
+
+Sa présence indique à Yeria que l'appel vient de votre déploiement de travail,
+sa valeur désigne la ligne qui vérifie la signature. Vaut pour `notify` et
+`fetch_user_details` ; la rotation de clé est refusée (403). Le réglage expire
+seul — 30 jours par défaut, 90 au maximum. **À laisser vide en production.**
+
 ## Yeria Links
 
 `YeriaLink` generates canonical links without making a network request. HTTPS

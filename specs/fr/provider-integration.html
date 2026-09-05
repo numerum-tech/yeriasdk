@@ -1,18 +1,18 @@
-<p>Comment un fournisseur branche son backend sur Yeria, de bout en bout : clés, authentification, profils utilisateurs. Deux esquisses de langage ; un seul protocole.</p>
+<p>Comment un fournisseur branche son backend sur Yeria, de bout en bout : clés, authentification, profils utilisateurs. Les exemples sont donnés dans deux langages et suivent le même protocole.</p>
 
-<p>Le SDK fournit <strong>des helpers, pas du middleware</strong>. Vous les câblez dans votre propre couche d'authentification (middleware Express, dépendance FastAPI, handler Total.js…). Il n'existe pas de <code class="ys-code">YeriaApp.authMiddleware()</code> et il n'en existera jamais : l'intégration au framework reste votre choix.</p>
+<p>Le SDK vous donne des helpers plutôt qu'un middleware. Vous les câblez dans votre propre couche d'authentification, que ce soit un middleware Express, une dépendance FastAPI ou un handler Total.js. Il n'existe pas de <code class="ys-code">YeriaApp.authMiddleware()</code>, parce que la façon dont le SDK rencontre votre framework vous revient, pas à nous.</p>
 
 <hr>
 
 <h2 id="where-your-backend-sits">Où se situe votre backend</h2>
 
-<p>Yeria est un <strong>registre et un fournisseur d'identité</strong>, pas un proxy. Une fois que l'application mobile a résolu votre service, elle parle <strong>directement à votre URL</strong>. Yeria ne voit jamais ce trafic.</p>
+<p>Yeria est un registre et un fournisseur d'identité, pas un proxy. Une fois que l'application mobile a résolu votre service, elle parle directement à votre URL, et Yeria ne voit jamais ce trafic.</p>
 
 <pre class="ys-codeblock"><code>[Mobile] ── discovers service ──&gt; [Yeria]        (catalog, review, signing keys)
 [Mobile] ── mints service JWT ──&gt; [Yeria]        (POST /user/service-token)
 [Mobile] ── Bearer &lt;serviceJWT&gt; ─&gt; [Your backend]  ← all real traffic</code></pre>
 
-<p>Votre backend doit donc être joignable en HTTPS depuis les appareils des utilisateurs, et vérifier lui-même chaque jeton entrant. C'est l'objet de cette page.</p>
+<p>Votre backend doit donc être joignable en HTTPS depuis les appareils des utilisateurs, et vérifier lui-même chaque jeton entrant. Les deux points sont traités plus bas.</p>
 
 <hr>
 
@@ -40,7 +40,7 @@ const { privateKey, publicKey } = generateKeyPairSync('ed25519');
 const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' });
 const publicPem  = publicKey.export({ type: 'spki', format: 'pem' });</code></pre>
 
-<p>La clé publique ressemble à ceci — une courte ligne base64, parce qu'une clé Ed25519 fait 32 octets :</p>
+<p>La clé publique tient sur une courte ligne base64, une clé Ed25519 faisant 32 octets :</p>
 
 <pre class="ys-codeblock"><code>-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEA14UIHuc98YQOnlD+EB8BIT2zbEzPJipRvXtcQifZ+jE=
@@ -52,11 +52,34 @@ MCowBQYDK2VwAyEA14UIHuc98YQOnlD+EB8BIT2zbEzPJipRvXtcQifZ+jE=
 
 <p>Collez le PEM <strong>public</strong> dans le champ <em>clé publique du fournisseur</em> de votre service, depuis l'espace fournisseur Yeria (Services → votre service → Modifier). Yeria le stocke dans son registre de clés et s'en sert pour vérifier tout ce que vous signez.</p>
 
-<p>Sur un service déjà validé par une revue Yeria, changer la clé est une modification du registre : elle est mise en brouillon et appliquée à la validation de la revue. La rotation d'urgence suit un chemin distinct — voir <em>Rotation de clés</em> plus bas.</p>
+<p>Sur un service déjà validé par une revue Yeria, changer la clé est une modification du registre : elle est mise en brouillon et appliquée à la validation de la revue. La rotation d'urgence suit un autre chemin, décrit sous <em>Rotation de clés</em> plus bas.</p>
 
 <h2 id="3-configure-your-backend">3. Configurer votre backend</h2>
 
 <div class="ys-table-wrap"><table><thead><tr><th>Variable d'environnement</th><th>Rôle</th></tr></thead><tbody><tr><td><code class="ys-code">YERIA_BASE_URL</code></td><td>Par exemple <code class="ys-code">https://yeria.app</code>. La barre oblique finale est facultative.</td></tr><tr><td><code class="ys-code">YERIA_APP_ID</code></td><td>Identifiant de votre application ; transporté dans chaque charge utile signée.</td></tr><tr><td><code class="ys-code">YERIA_SERVICE_ID</code></td><td>Identifiant de votre service dans Yeria. Sert à épingler l'audience du jeton.</td></tr><tr><td><code class="ys-code">SERVICE_ED25519_PRIVATE_KEY</code></td><td>PEM de la clé privée générée à l'étape 1.</td></tr></tbody></table></div>
+
+<hr>
+
+<h2 id="4-point-yeria-at-your-laptop">4. Faire pointer Yeria sur votre poste (facultatif)</h2>
+
+<p>Vous pouvez demander à Yeria d'envoyer votre propre compte vers votre déploiement de travail pendant que tous les autres continuent d'utiliser la production. Yeria bascule ensemble l'URL du service et sa clé de vérification, de sorte que votre téléphone contrôle ce que votre poste a signé.</p>
+
+<p>Il vous faut d'abord un accès explicite au service : Services &rarr; votre service &rarr; Accès. Appartenir au fournisseur ne vous le donne pas, et avoir enregistré le service non plus. Sans cet accès, l'écran Développement répond 403. Invitez le compte depuis lequel vous développez, qui n'est souvent pas celui avec lequel vous avez enregistré, puis acceptez l'invitation.</p>
+
+<p>Allez ensuite dans Services &rarr; votre service &rarr; Développement et donnez-lui deux choses : l'URL à laquelle votre déploiement répond, et le PEM public d'une paire de clés générée pour l'occasion. <strong>Ne réutilisez pas votre clé de production.</strong> Yeria vous répond avec un sélecteur du genre <code class="ys-code">devkey_a3f9c81e04b2d675</code>. Placez-le dans votre configuration, à côté de la clé privée correspondante :</p>
+
+<pre class="ys-codeblock" data-lang="ts"><code>const yeriaApp = new YeriaApp({
+  appId: 'my-backend-service',
+  privateKey: devPrivateKey,        // la clé de développement, pas celle de production
+  baseUrl: 'https://yeria.app',
+  devKeyId: 'devkey_a3f9c81e04b2d675'
+});</code></pre>
+
+<p>En Python, le champ s'appelle <code class="ys-code">dev_key_id</code>. Sa présence indique à Yeria que l'appel vient de votre déploiement, et sa valeur choisit la ligne qui contrôle votre signature. Le renseigner sans détenir la clé privée correspondante ne mène nulle part, puisqu'il ne fait que choisir les clés auxquelles Yeria vous compare.</p>
+
+<p>Vous en disposez sur <code class="ys-code">notify</code> et <code class="ys-code">fetchUserDetails</code>. La rotation de clé répond 403, car renouveler la clé de production d'un service doit venir de la production plutôt que d'un poste dont la clé expire d'elle-même. Les notifications signées ainsi n'atteignent que votre propre compte : vous ne pouvez pas réveiller de vrais utilisateurs depuis une version de développement.</p>
+
+<p>Le réglage s'efface tout seul au bout de 30 jours, ou 90 si vous demandez le maximum. Tant qu'il est actif, l'application mobile affiche un bandeau sur le service avec un bouton pour le retirer, et ce bouton fonctionne encore après une révocation de votre accès : vous ne restez donc jamais bloqué sur un écran de développement. <strong>Laissez <code class="ys-code">devKeyId</code> vide en production.</strong></p>
 
 <hr>
 
@@ -74,7 +97,7 @@ MCowBQYDK2VwAyEA14UIHuc98YQOnlD+EB8BIT2zbEzPJipRvXtcQifZ+jE=
                                           v
                                   [YeriaUI builds a view → app.serve(view)]</code></pre>
 
-<p>L'étape 1 est le chemin chaud : aucun appel réseau une fois la clé de signature en cache. L'étape 2 ne se déclenche qu'au premier appel par utilisateur, puis plus jamais — persistez le profil par <code class="ys-code">sub</code> et servez-le localement ensuite.</p>
+<p>L'étape 1 est le chemin chaud et ne fait aucun appel réseau une fois la clé de signature en cache. L'étape 2 ne se déclenche qu'au premier appel par utilisateur et plus jamais ensuite, alors rangez le profil sous son <code class="ys-code">sub</code> et servez-le localement.</p>
 
 <hr>
 
@@ -212,9 +235,9 @@ CREATE INDEX users_yeria_sub_idx ON users (yeria_sub);</code></pre>
 
 <h2 id="key-rotation">Rotation de clés</h2>
 
-<p><strong>La clé de Yeria</strong> tourne selon son propre calendrier. L'ancienne reste valide pendant une courte période de grâce, puis cesse d'être résolue. Le magasin de clés interne du SDK suit le <code class="ys-code">kid</code> présent dans l'en-tête de chaque jeton : vous n'avez rien à faire.</p>
+<p>La clé de Yeria tourne selon son propre calendrier. L'ancienne reste valide pendant une courte période de grâce, puis cesse d'être résolue. Le magasin de clés interne du SDK suit le <code class="ys-code">kid</code> présent dans l'en-tête de chaque jeton : vous n'avez rien à faire.</p>
 
-<p><strong>Votre clé</strong> tourne lorsque vous appelez <code class="ys-code">app.rotateKey(...)</code>, ou depuis le formulaire d'édition du service. La clé précédente continue de vérifier pendant une période de grâce de 5 minutes, afin que les requêtes en cours survivent au basculement.</p>
+<p>Votre propre clé tourne lorsque vous appelez <code class="ys-code">app.rotateKey(...)</code>, ou depuis le formulaire d'édition du service. La clé précédente continue de vérifier pendant une période de grâce de 5 minutes, afin que les requêtes en cours survivent au basculement.</p>
 
 <hr>
 
@@ -224,14 +247,14 @@ CREATE INDEX users_yeria_sub_idx ON users (yeria_sub);</code></pre>
 
 <hr>
 
-<h2 id="errors-quick-reference">Erreurs — aide-mémoire</h2>
+<h2 id="errors-quick-reference">Erreurs : aide-mémoire</h2>
 
-<div class="ys-table-wrap"><table><thead><tr><th>Erreur du SDK</th><th>Cause probable</th><th>Réponse HTTP adaptée</th></tr></thead><tbody><tr><td><code class="ys-code">SignatureVerificationError</code></td><td>Mauvaise clé, jeton falsifié, ou clé à laquelle Yeria ne fait plus confiance</td><td><code class="ys-code">401</code></td></tr><tr><td><code class="ys-code">ViewExpiredError</code></td><td><code class="ys-code">exp</code> est dans le passé</td><td><code class="ys-code">401</code></td></tr><tr><td><code class="ys-code">YeriaPlatformUnreachableError</code></td><td>Yeria est hors service ou injoignable — le jeton lui-même est peut-être valide</td><td><code class="ys-code">503</code></td></tr><tr><td>Échec de récupération du profil</td><td>Identifiant de service mal configuré, enveloppe rejouée, ou clé refusée par Yeria</td><td><code class="ys-code">502</code> / <code class="ys-code">503</code></td></tr><tr><td>Forme de réponse inattendue</td><td>Yeria a fait évoluer le format de transport et votre SDK est plus ancien</td><td>Mettez le SDK à jour</td></tr></tbody></table></div>
+<div class="ys-table-wrap"><table><thead><tr><th>Erreur du SDK</th><th>Cause probable</th><th>Réponse HTTP adaptée</th></tr></thead><tbody><tr><td><code class="ys-code">SignatureVerificationError</code></td><td>Mauvaise clé, jeton falsifié, ou clé à laquelle Yeria ne fait plus confiance</td><td><code class="ys-code">401</code></td></tr><tr><td><code class="ys-code">ViewExpiredError</code></td><td><code class="ys-code">exp</code> est dans le passé</td><td><code class="ys-code">401</code></td></tr><tr><td><code class="ys-code">YeriaPlatformUnreachableError</code></td><td>Yeria est hors service ou injoignable , le jeton lui-même est peut-être valide</td><td><code class="ys-code">503</code></td></tr><tr><td>Échec de récupération du profil</td><td>Identifiant de service mal configuré, enveloppe rejouée, ou clé refusée par Yeria</td><td><code class="ys-code">502</code> / <code class="ys-code">503</code></td></tr><tr><td>Forme de réponse inattendue</td><td>Yeria a fait évoluer le format de transport et votre SDK est plus ancien</td><td>Mettez le SDK à jour</td></tr></tbody></table></div>
 
-<p>Renvoyez vos erreurs au mobile via <code class="ys-code">app.serveError({ code, message, status })</code> pour qu'elles arrivent signées — voir <a href="/docs/sdk">YeriaUI &amp; YeriaApp</a>.</p>
+<p>Renvoyez vos erreurs au mobile via <code class="ys-code">app.serveError({ code, message, status })</code> pour qu'elles arrivent signées. Voir <a href="/docs/sdk">YeriaUI &amp; YeriaApp</a>.</p>
 
 <hr>
 
 <h2 id="see-also">Voir aussi</h2>
 
-<ul><li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a> — toute la surface d'API</li><li><a href="/docs/introduction">Spécifications des composants</a> — tous les types de vue</li><li><a href="/docs/notifications">Notifications</a> — règles d'abonnement et erreurs de distribution</li></ul>
+<ul><li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a> : toute la surface d'API</li><li><a href="/docs/introduction">Spécifications des composants</a> : tous les types de vue</li><li><a href="/docs/notifications">Notifications</a> : règles d'abonnement et erreurs de distribution</li></ul>

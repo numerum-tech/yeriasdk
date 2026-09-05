@@ -40,6 +40,10 @@ export interface SecureNotificationResponse {
     signature: string;
     timestamp: number;
     notification: NotificationPayload;
+    /** Selecteur d'un point de developpement, present uniquement quand le
+     *  service tourne depuis un deploiement de travail. Couvert par la
+     *  signature. */
+    devKeyId?: string;
 }
 
 export interface NotificationConfig {

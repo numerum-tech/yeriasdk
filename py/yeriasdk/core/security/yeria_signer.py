@@ -85,7 +85,13 @@ class YeriaSigner:
         payload = dumps_for_signing({"appId": app_id, "timestamp": timestamp, "view": view})
         return SignedEnvelope(payload=payload, signature=self.sign_payload(payload))
 
-    def sign_notification(self, notification: Any, app_id: str, timestamp: Optional[int] = None) -> SecureNotificationResponse:
+    def sign_notification(
+        self,
+        notification: Any,
+        app_id: str,
+        timestamp: Optional[int] = None,
+        dev_key_id: Optional[str] = None,
+    ) -> SecureNotificationResponse:
         """Sign a notification into a SecureNotificationResponse (signature over the payload bytes)."""
         if timestamp is None:
             timestamp = int(time.time() * 1000)
@@ -104,12 +110,27 @@ class YeriaSigner:
             "message": message,
         }
         # Compact separators to byte-match JS JSON.stringify.
-        payload = dumps_for_signing(
-            {"notification": notification_dict, "timestamp": timestamp, "appId": app_id}
-        )
+        # `devKeyId` n'entre dans la charge signee QUE s'il existe, et en
+        # DERNIERE position — l'ordre des cles fait partie des octets signes, et
+        # JS insere la sienne au meme endroit. Une notification de production
+        # garde ainsi exactement la forme qu'elle avait.
+        signed_body = {
+            "notification": notification_dict,
+            "timestamp": timestamp,
+            "appId": app_id,
+        }
+        # Test de VERITE, pas `is not None` : JS n'ajoute la cle que si elle est
+        # non vide, et le backend reconstruit la charge avec la meme condition.
+        # Avec `dev_key_id=""` — une variable d'environnement vide, cas banal —
+        # Python signait quatre cles la ou le serveur en verifiait trois : toutes
+        # les notifications echouaient, et seulement en Python.
+        if dev_key_id:
+            signed_body["devKeyId"] = dev_key_id
+        payload = dumps_for_signing(signed_body)
         return SecureNotificationResponse(
             app_id=app_id,
             signature=self.sign_payload(payload),
             timestamp=timestamp,
             notification=notification_json,
+            dev_key_id=dev_key_id or None,
         )

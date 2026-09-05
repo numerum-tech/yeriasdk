@@ -679,4 +679,7 @@ class SecureNotificationResponse:
     signature: str
     timestamp: int
     notification: NotificationPayload
+    # Selecteur d'un point de developpement, present uniquement quand le
+    # service tourne depuis un deploiement de travail. Couvert par la signature.
+    dev_key_id: Optional[str] = None
 

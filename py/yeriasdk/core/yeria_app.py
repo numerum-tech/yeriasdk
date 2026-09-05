@@ -53,6 +53,13 @@ class YeriaAppConfig:
     view_expiration_minutes: int = 60
     base_url: Optional[str] = None  # Yeria platform base URL (e.g. https://yeria.app)
     notification_timeout: int = 5
+    # Selecteur d'un point de developpement, rendu par le tableau de bord
+    # fournisseur apres enregistrement de l'URL et de la cle de developpement
+    # (`devkey_...`). Sa PRESENCE dit a Yeria que l'appel vient d'un
+    # deploiement de travail, sa VALEUR designe la ligne qui verifie la
+    # signature. Le declarer sans detenir la cle privee correspondante ne donne
+    # rien. A laisser vide en production.
+    dev_key_id: Optional[str] = None
 
 
 class YeriaApp:
@@ -81,6 +88,7 @@ class YeriaApp:
             signer=self._signer,
             base_url=config.base_url,
             notification_timeout=config.notification_timeout,
+            dev_key_id=config.dev_key_id,
         )
 
     # ── Views: sign / verify ────────────────────────────────────────────

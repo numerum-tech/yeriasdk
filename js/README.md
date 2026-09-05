@@ -462,7 +462,7 @@ console.log(storeMap.toJSON());
 ### Notifications
 
 Envoyer des notifications signées aux utilisateurs via la plateforme Yeria
-(POST `{baseUrl}/api/v1/user/notifications`) :
+(POST `{baseUrl}/api/v1/provider/services/{appId}/notifications`) :
 
 ```typescript
 import { YeriaApp, Notification } from '@numerum-tech/yeriasdk';
@@ -478,6 +478,34 @@ const notification = new Notification('user-123', 'Bienvenue !', 'Merci d\'avoir
 
 await yeriaApp.sendNotification(notification);
 ```
+
+L'appel ne porte aucun jeton : la signature Ed25519 du service l'authentifie,
+comme toutes les routes `/api/v1/provider/*`.
+
+#### Depuis un déploiement de développement
+
+Après avoir enregistré l'URL et la clé publique de votre déploiement de travail
+dans le tableau de bord fournisseur, celui-ci vous rend un identifiant
+`devkey_...`. Reportez-le dans `devKeyId` :
+
+```typescript
+const yeriaApp = new YeriaApp({
+  appId: 'my-backend-service',
+  privateKey: devPrivateKey,      // la clé de développement, pas celle de production
+  baseUrl: 'https://yeria.app',
+  devKeyId: 'devkey_a3f9c81e04b2d675'
+});
+```
+
+Sa présence indique à Yeria que l'appel vient de votre déploiement de travail,
+sa valeur désigne la ligne qui vérifie la signature. Le déclarer sans détenir la
+clé privée correspondante ne donne rien : le champ ne fait que choisir le jeu de
+clés, la signature reste la preuve.
+
+Ce mode vaut pour `notify` et `fetchUserDetails`. La rotation de clé est refusée
+(403) : faire tourner la clé de production doit venir de la production. Et le
+réglage expire tout seul — 30 jours par défaut, 90 au maximum. **À laisser vide
+en production.**
 
 ### YeriaApp sécurisé
 

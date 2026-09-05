@@ -18,6 +18,21 @@ export interface YeriaAppConfig {
     viewExpirationMinutes?: number;
     baseUrl?: string; // Yeria platform base URL (e.g. https://yeria.app) — used for notifications and profile fetch
     notificationTimeout?: number; // HTTP request timeout in ms (default: 5000)
+    /**
+     * Selecteur d'un point de developpement, tel que le tableau de bord
+     * fournisseur le rend apres l'enregistrement de l'URL et de la cle de
+     * developpement (`devkey_...`).
+     *
+     * Un seul champ, deux effets : sa PRESENCE dit a Yeria que cet appel vient
+     * d'un deploiement de developpement, sa VALEUR designe la ligne qui doit
+     * verifier la signature. Pas de drapeau separe, donc pas d'etat incoherent
+     * possible.
+     *
+     * Le declarer sans detenir la cle privee correspondante ne donne rien : le
+     * champ ne fait que choisir le jeu de cles, la signature reste la preuve.
+     * A laisser vide en production.
+     */
+    devKeyId?: string;
 }
 
 /**
@@ -65,7 +80,8 @@ export class YeriaApp {
             appId: this.config.appId,
             signer: this.signer,
             baseUrl: this.config.baseUrl,
-            notificationTimeout: this.config.notificationTimeout
+            notificationTimeout: this.config.notificationTimeout,
+            devKeyId: this.config.devKeyId
         });
     }
 

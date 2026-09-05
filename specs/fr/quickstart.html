@@ -1,4 +1,4 @@
-<p>Un endpoint HTTP, une vue, un test dans l'application. Cette page suit le chemin le plus court ; les détails du protocole sont dans <a href="/docs/integration">Intégration provider</a>.</p>
+<p>Cette page vous amène à un endpoint qui sert une vue, testée dans l'application, par le chemin le plus court. Les détails du protocole sont dans <a href="/docs/integration">Intégration provider</a>.</p>
 
 <p>Ce dont vous avez besoin : un backend joignable en HTTPS depuis un téléphone, Node 18+ ou Python 3.10+, et un compte Yeria.</p>
 
@@ -31,7 +31,7 @@ openssl pkey -in service_private.pem -pubout -out service_public.pem</code></pre
     <pre class="ys-codeblock" data-panel="py" hidden><code>pip install yeriasdk</code></pre>
 </div>
 
-<p>Aucune dépendance native : l'installation ne compile rien. La signature Ed25519 s'appuie sur la bibliothèque standard des deux plateformes.</p>
+<p>L'installation ne compile rien. La signature Ed25519 s'appuie sur la bibliothèque standard des deux plateformes, il n'y a donc aucune dépendance native à construire.</p>
 
 <h2 id="configurer">4. Configurer le backend</h2>
 
@@ -100,7 +100,7 @@ def recharge():
 
 <h2 id="jeton">6. Vérifier le jeton utilisateur</h2>
 
-<p>L'application appelle votre endpoint avec un jeton porteur émis par Yeria pour votre service. Vous le vérifiez vous-même : le SDK fournit des helpers, pas de middleware.</p>
+<p>L'application appelle votre endpoint avec un jeton porteur émis par Yeria pour votre service. Vous le vérifiez vous-même. Le SDK vous donne des helpers pour cela ; il ne vous impose pas de middleware.</p>
 
 <pre class="ys-codeblock" data-lang="js"><code>const auth = req.headers.authorization || '';
 const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';
@@ -110,16 +110,16 @@ const user = await app.verifyUserToken(bearer, process.env.YERIA_SERVICE_ID);</c
 
 <h2 id="tester">7. Tester</h2>
 
-<p><strong>Votre service n'est pas encore au catalogue.</strong> Tant qu'il n'est pas passé par la revue Yeria — et chaque fois qu'il est dépublié — il n'apparaît ni dans la recherche ni dans les listes publiques. Vous le trouverez dans l'application sous <em>Mes services privés</em>, et nulle part ailleurs.</p>
+<p>Votre service n'est pas encore au catalogue. Tant qu'il n'est pas passé par la revue Yeria, et chaque fois qu'il est dépublié, il n'apparaît ni dans la recherche ni dans les listes publiques. Vous le trouverez dans l'application sous <em>Mes services privés</em>, et nulle part ailleurs.</p>
 
-<p><strong>Vous devez vous y inviter vous-même.</strong> Cette section liste les services auxquels on vous a donné accès : ouvrez donc votre service dans l'espace fournisseur, allez à l'onglet <em>Accès</em>, et invitez le compte que vous utilisez dans l'application. L'invitation arrive dans l'application, vous l'acceptez, et le service apparaît dans votre liste privée, avec la vue que sert votre backend.</p>
+<p>Cette section ne liste que les services auxquels on vous a donné accès : vous devez donc vous y inviter vous-même. Ouvrez votre service dans l'espace fournisseur, allez à l'onglet <em>Accès</em>, et invitez le compte que vous utilisez dans l'application. Acceptez l'invitation quand elle arrive, et le service apparaît dans votre liste privée avec la vue que sert votre backend.</p>
 
-<p>Ouvrez votre service depuis l'application Yeria. L'écran décrit à l'étape 4 apparaît en rendu natif. Modifiez la vue, redéployez votre backend, rouvrez le service : l'écran a changé, sans passer par un store.</p>
+<p>Ouvrez votre service depuis l'application Yeria. L'écran de l'étape 5 apparaît en rendu natif. Modifiez la vue, redéployez, puis rouvrez le service : l'écran change sans qu'il faille publier une nouvelle version de l'application.</p>
 
 <h2 id="ensuite">Ensuite</h2>
 
 <ul>
-    <li><a href="/docs/integration">Intégration provider</a> — rotation de clés, profils utilisateurs, gestion des erreurs.</li>
-    <li><a href="/docs/formview">FormView</a> — tous les types de champs et leurs validations.</li>
-    <li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a> — la répartition exacte des responsabilités.</li>
+    <li><a href="/docs/integration">Intégration provider</a> : rotation de clés, profils utilisateurs, gestion des erreurs.</li>
+    <li><a href="/docs/formview">FormView</a> : tous les types de champs et leurs validations.</li>
+    <li><a href="/docs/sdk">YeriaUI &amp; YeriaApp</a> : la répartition exacte des responsabilités.</li>
 </ul>

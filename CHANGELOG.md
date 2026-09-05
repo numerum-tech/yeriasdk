@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-09-05
+
+Two of the SDK's calls to Yeria could not have worked: their URLs matched no
+route on the backend. Nothing exercised them end to end, so nobody had noticed.
+The development endpoint arrives in the same release, because it is what made
+the broken paths visible.
+
+### Added
+
+- `devKeyId` (`dev_key_id` in Python) in the client configuration: the selector
+  the provider dashboard hands you once you register a development endpoint.
+  Its presence tells Yeria the call comes from a working deployment; its value
+  names the row that verifies the signature. One field to copy, and the
+  signature stays the only proof, so declaring a `devKeyId` you hold no private
+  key for buys nothing.
+
+  It goes into the **signed** payload, in last position, since key order is part
+  of the bytes being signed. It is added only when it is set: adding it
+  unconditionally would change the shape of every production payload and break
+  signatures already in the field. It covers `notify` and `fetchUserDetails`.
+  Leave it unset in production.
+
+- Key rotation is refused locally in development mode, before any request
+  leaves. Rotating a service's production key is the heaviest action on this
+  surface, and it should not start from a workstation whose key expires on its
+  own.
+
+### Fixed
+
+- `sendNotification` targeted `POST /api/v1/user/notifications`, a path the
+  middleware keeps behind a user JWT this client does not send, so every
+  notification came back 401. It now posts to
+  `POST /api/v1/provider/services/{appId}/notifications`, signed and without a
+  bearer token, like the other provider routes.
+
+- `rotateKey` targeted `/api/v1/services/{id}/keys/rotate`, written before the
+  six-prefix taxonomy. That path matches no route and answered 404. It is now
+  `/api/v1/provider/services/{id}/keys/rotate`.
+
+- Python SDK: the request body always carried `"link"`, even when absent, while
+  the signed payload omits it. The backend rebuilds what it verifies from the
+  object it receives, so every Python notification without a link failed
+  signature verification.
+
 ## [1.4.0] - 2026-09-05
 
 Three breaking changes, all on the wire. Provider code keeps compiling in
